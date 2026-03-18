@@ -1,0 +1,73 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+// --- AS TABELAS DO SEU DIAGRAMA ---
+
+model Usuario {
+  id           Int           @id @default(autoincrement())
+  nome         String
+  email        String        @unique
+  senha        String
+  cargo        String
+  ativo        Boolean       @default(true)
+  
+  // O Prisma entende que um médico pode ter vários atendimentos
+  atendimentos Atendimento[] 
+}
+
+model Convenio {
+  id        Int        @id @default(autoincrement())
+  nome      String
+  ativo     Boolean    @default(true)
+  pacientes Paciente[] 
+}
+
+model Procedimento {
+  id             Int           @id @default(autoincrement())
+  nome           String
+  tempo_estimado Int
+  ativo          Boolean       @default(true)
+  atendimentos   Atendimento[] 
+}
+
+model Paciente {
+  id              Int           @id @default(autoincrement())
+  nome            String
+  cpf             String        @unique
+  data_nascimento DateTime?
+  telefone        String
+  cep             String?
+  endereco        String?
+  
+  // A seta ligando no Convênio
+  convenio_id     Int?
+  convenio        Convenio?     @relation(fields: [convenio_id], references: [id])
+  
+  atendimentos    Atendimento[]
+}
+
+model Atendimento {
+  id              Int           @id @default(autoincrement())
+  tipo            String
+  prioridade      Boolean       @default(false)
+  status          String        @default("AGUARDANDO")
+  criado_em       DateTime      @default(now())
+  chamado_em      DateTime?
+  finalizado_em   DateTime?
+
+  // As setinhas que você puxou lá no Draw.io
+  paciente_id     Int
+  paciente        Paciente      @relation(fields: [paciente_id], references: [id])
+  
+  procedimento_id Int
+  procedimento    Procedimento  @relation(fields: [procedimento_id], references: [id])
+  
+  medico_id       Int?          // Fica vazio até o médico puxar a ficha
+  medico          Usuario?      @relation(fields: [medico_id], references: [id])
+}
