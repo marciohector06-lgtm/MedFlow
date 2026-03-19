@@ -1,0 +1,11 @@
+version: '3.8'
+services:
+  postgres:
+    image: postgres:15
+    container_name: medflow-db
+    environment:
+      POSTGRES_USER: admin
+      POSTGRES_PASSWORD: admin123
+      POSTGRES_DB: medflow_db
+    ports:
+      - "5432:5432"
