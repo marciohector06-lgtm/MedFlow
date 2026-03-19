@@ -8,22 +8,23 @@ const app = express();
 app.use(cors());
 app.use(express.json());
 
-
 app.get('/', (req, res) => {
   res.json({ mensagem: 'API do MedFlow rodando 100%!' });
 });
 
-
+// --- PACIENTES ---
 app.get('/pacientes', async (req, res) => {
   try {
-    const pacientes = await prisma.paciente.findMany();
+    const { cpf } = req.query;
+    const pacientes = await prisma.paciente.findMany({
+      where: cpf ? { cpf: cpf } : {},
+    });
     res.json(pacientes);
   } catch (erro) {
     console.error(erro);
-    res.status(500).json({ erro: 'Erro ao buscar pacientes' });
+    res.status(500).json({ erro: 'Erro ao buscar pacientes.' });
   }
 });
-
 
 app.post('/pacientes', async (req, res) => {
   try {
@@ -34,13 +35,11 @@ app.post('/pacientes', async (req, res) => {
     res.status(201).json(novoPaciente);
   } catch (erro) {
     console.error(erro);
-    res.status(500).json({ erro: 'Erro ao cadastrar. O CPF pode estar duplicado.' });
+    res.status(500).json({ erro: 'Erro ao cadastrar. CPF duplicado?' });
   }
 });
 
-// --- ROTAS DE PROCEDIMENTOS ---
-
-
+// --- PROCEDIMENTOS ---
 app.post('/procedimentos', async (req, res) => {
   try {
     const { nome, tempo_estimado } = req.body;
@@ -54,37 +53,15 @@ app.post('/procedimentos', async (req, res) => {
   }
 });
 
-
-// --- ROTAS DE ATENDIMENTOS ---
-
-
-app.post('/atendimentos', async (req, res) => {
-  try {
-    const { tipo, prioridade, paciente_id, procedimento_id } = req.body;
-    
-    const novoAtendimento = await prisma.atendimento.create({
-      data: {
-        tipo,
-        prioridade: prioridade || false,
-        paciente_id,
-        procedimento_id
-      }
-    });
-    
-    res.status(201).json(novoAtendimento);
-  } catch (erro) {
-    console.error(erro);
-    res.status(500).json({ erro: 'Erro ao criar atendimento. Verifique se o paciente e procedimento existem.' });
-  }
-});
-
-
+// --- ATENDIMENTOS ---
 app.get('/atendimentos', async (req, res) => {
   try {
+    const { status } = req.query;
     const atendimentos = await prisma.atendimento.findMany({
+      where: status ? { status: status } : {},
       include: {
-        paciente: true, 
-        procedimento: true 
+        paciente: true,
+        procedimento: true
       }
     });
     res.json(atendimentos);
@@ -94,51 +71,61 @@ app.get('/atendimentos', async (req, res) => {
   }
 });
 
-app.post('/usuarios', async (req, res) =>{
-    try{
-        const { nome, email, senha,cargo } = req.body;
-
-        const novoUsuario = await prisma.usuario.create({
-            data: { nome, email, senha, cargo } 
-        });
-        res.status(201).json(novoUsuario);  
-    }catch (erro) {
-        console.erro(erro);
-        res.status(500).json({erro: 'Erro ao cadastrar usuário. Verifique se o e-mail já existe.'});
-
-    }
+app.post('/atendimentos', async (req, res) => {
+  try {
+    const { tipo, prioridade, paciente_id, procedimento_id } = req.body;
+    const novoAtendimento = await prisma.atendimento.create({
+      data: {
+        tipo,
+        prioridade: prioridade || false,
+        paciente_id,
+        procedimento_id
+      }
+    });
+    res.status(201).json(novoAtendimento);
+  } catch (erro) {
+    console.error(erro);
+    res.status(500).json({ erro: 'Erro ao criar atendimento.' });
+  }
 });
-app.get('/usuarios', async (req, res) => {
-
-    try{
-        const usuarios = await prisma.usuario.findMany();
-        res.json(usuarios);
-    }catch (erro){
-        console.error(erro);
-        res.status(500).json({erro: 'Erro ao buscar usúarios.'});
-
-    }
-});
-// Rota para ATUALIZAR um Atendimento (PUT) - O Médico chamando o paciente
 
 app.put('/atendimentos/:id', async (req, res) => {
-    try {
-        const { id } = req.params;
-        const { medico_id, status } = req.body;
-        
-        const atendimentoAtualizado = await prisma.atendimento.update({
-            where: { id: parseInt(id) },
-            data: {
-                medico_id,
-                status,
-            }
-        });
-        
-        res.json(atendimentoAtualizado);
-    } catch (erro) {
-        console.error(erro);
-        res.status(500).json({ erro: 'Erro ao atualizar. Verifique se o ID existe.' });
-    }
+  try {
+    const { id } = req.params;
+    const { medico_id, status } = req.body;
+    const atendimentoAtualizado = await prisma.atendimento.update({
+      where: { id: parseInt(id) },
+      data: { medico_id, status }
+    });
+    res.json(atendimentoAtualizado);
+  } catch (erro) {
+    console.error(erro);
+    res.status(500).json({ erro: 'Erro ao atualizar atendimento.' });
+  }
+});
+
+// --- USUÁRIOS ---
+app.post('/usuarios', async (req, res) => {
+  try {
+    const { nome, email, senha, cargo } = req.body;
+    const novoUsuario = await prisma.usuario.create({
+      data: { nome, email, senha, cargo }
+    });
+    res.status(201).json(novoUsuario);
+  } catch (erro) {
+    console.error(erro);
+    res.status(500).json({ erro: 'Erro ao cadastrar usuário.' });
+  }
+});
+
+app.get('/usuarios', async (req, res) => {
+  try {
+    const usuarios = await prisma.usuario.findMany();
+    res.json(usuarios);
+  } catch (erro) {
+    console.error(erro);
+    res.status(500).json({ erro: 'Erro ao buscar usuários.' });
+  }
 });
 
 const PORTA = 3333;
