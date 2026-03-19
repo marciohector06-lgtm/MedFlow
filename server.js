@@ -94,6 +94,36 @@ app.get('/atendimentos', async (req, res) => {
   }
 });
 
+app.post('/usuarios', async (req, res) =>{
+    try{
+        const { nome, email, senha,cargo } = req.body;
+
+        const novoUsuario = await prisma.usuario.create({
+            data: { nome, email, senha, cargo } 
+        });
+        res.status(201).json(novoUsuario);  
+    }catch (erro) {
+        console.erro(erro);
+        res.status(500).json({erro: 'Erro ao cadastrar usuário. Verifique se o e-mail já existe.'});
+
+    }
+});
+app.get('/usuarios', async (req, res) => {
+
+    try{
+        const usuarios = await prisma.usuario.findMany();
+        res.json(usuarios);
+    }catch (erro){
+        console.error(erro);
+        res.status(500).json({erro: 'Erro ao buscar usúarios.'});
+
+    }
+});
+
+
+
+
+
 const PORTA = 3333;
 app.listen(PORTA, () => {
   console.log(`🚀 Servidor voando na porta http://localhost:${PORTA}`);
