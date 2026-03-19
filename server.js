@@ -119,10 +119,27 @@ app.get('/usuarios', async (req, res) => {
 
     }
 });
+// Rota para ATUALIZAR um Atendimento (PUT) - O Médico chamando o paciente
 
-
-
-
+app.put('/atendimentos/:id', async (req, res) => {
+    try {
+        const { id } = req.params;
+        const { medico_id, status } = req.body;
+        
+        const atendimentoAtualizado = await prisma.atendimento.update({
+            where: { id: parseInt(id) },
+            data: {
+                medico_id,
+                status,
+            }
+        });
+        
+        res.json(atendimentoAtualizado);
+    } catch (erro) {
+        console.error(erro);
+        res.status(500).json({ erro: 'Erro ao atualizar. Verifique se o ID existe.' });
+    }
+});
 
 const PORTA = 3333;
 app.listen(PORTA, () => {
