@@ -15,27 +15,48 @@ app.get('/', (req, res) => {
 // --- PACIENTES ---
 app.get('/pacientes', async (req, res) => {
   try {
-    const { cpf } = req.query;
+    const { cpf, pagina = 1, limite = 10 } = req.query;
+    const pag = number(pagina);
+    const lim = number(limite);
+    const puiar = (pag - 1) * lim;
     const pacientes = await prisma.paciente.findMany({
-      where: cpf ? { cpf: cpf } : {},
+      where: cpf? {cpf: cpf} : {},
+      skip: Pular,
+      take: lim,
+
     });
-    res.json(pacientes);
-  } catch (erro) {
+    const totalRegistros = await prisma.paciente.count({
+     where: cpf ? {cpf: cpf } : {}
+    });
+    res.json({
+      dados: pacientes,
+      paginaAtual: pag,
+      totalPaginas: Math.ceil(totalRegistros / lim),
+      totalRegistros: totalRegistros
+    });
+  }catch (erro) {
     console.error(erro);
-    res.status(500).json({ erro: 'Erro ao buscar pacientes.' });
+    res.status(500).json({erro: 'erro ao buscar pacientes.'};)
   }
+
 });
 
 app.post('/pacientes', async (req, res) => {
   try {
     const { nome, cpf, telefone } = req.body;
+    if (!nome || !cpf || !telefone){
+      return res.status(400).json({erro: 'Faltam dados! Nome, CPF e telefone são obrigatorios.'})
+    }
+    if (cpf.length !== 11) {
+      return res.status(400).json({erro: 'CPF invalido! digite apenas os 11 numeroe do CPF!!'})
+    }
     const novoPaciente = await prisma.paciente.create({
-      data: { nome, cpf, telefone }
+      data: {nome, cpf, telefone }
     });
     res.status(201).json(novoPaciente);
-  } catch (erro) {
+  }catch (erro){
     console.error(erro);
-    res.status(500).json({ erro: 'Erro ao cadastrar. CPF duplicado?' });
+    res.status(500).json({erro: 'Erro ao cadastrar. O CPF ja existe no banco ?'});
   }
 });
 
@@ -71,9 +92,15 @@ app.get('/atendimentos', async (req, res) => {
   }
 });
 
+// ROTA POST DE ATENDIMENTOS COM VALIDAÇÃO
 app.post('/atendimentos', async (req, res) => {
   try {
     const { tipo, prioridade, paciente_id, procedimento_id } = req.body;
+
+    if (!tipo || !paciente_id || !procedimento_id) {
+      return res.status(400).json({ erro: 'Faltam dados! Tipo, paciente_id e procedimento_id são obrigatórios.' });
+    }
+
     const novoAtendimento = await prisma.atendimento.create({
       data: {
         tipo,
@@ -82,13 +109,13 @@ app.post('/atendimentos', async (req, res) => {
         procedimento_id
       }
     });
+    
     res.status(201).json(novoAtendimento);
   } catch (erro) {
     console.error(erro);
-    res.status(500).json({ erro: 'Erro ao criar atendimento.' });
+    res.status(500).json({ erro: 'Erro ao criar atendimento. Verifique se os IDs do paciente e procedimento estão corretos.' });
   }
 });
-
 app.put('/atendimentos/:id', async (req, res) => {
   try {
     const { id } = req.params;

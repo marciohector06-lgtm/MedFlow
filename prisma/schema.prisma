@@ -53,13 +53,17 @@ model Paciente {
 }
 
 model Atendimento {
-  id              Int           @id @default(autoincrement())
-  tipo            String
-  prioridade      Boolean       @default(false)
-  status          String        @default("AGUARDANDO")
-  criado_em       DateTime      @default(now())
-  chamado_em      DateTime?
-  finalizado_em   DateTime?
+  id            Int       @id @default(autoincrement())
+  tipo          String
+  prioridade    Boolean   @default(false)
+  status        String    @default("AGUARDANDO")
+  criado_em     DateTime  @default(now())
+  chamado_em    DateTime?
+  finalizado_em DateTime?
+  
+  // Aqui entram os campos novos que a gente planejou:
+  diagnostico   String?   @db.Text
+  prescricao    String?   @db.Text
 
   // As setinhas que você puxou lá no Draw.io
   paciente_id     Int
