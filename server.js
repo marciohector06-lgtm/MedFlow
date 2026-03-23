@@ -1,3 +1,4 @@
+require ('dotenv').config();
 const express = require('express');
 const cors = require('cors');
 const { PrismaClient } = require('@prisma/client');
@@ -16,9 +17,9 @@ app.get('/', (req, res) => {
 app.get('/pacientes', async (req, res) => {
   try {
     const { cpf, pagina = 1, limite = 10 } = req.query;
-    const pag = number(pagina);
-    const lim = number(limite);
-    const puiar = (pag - 1) * lim;
+    const pag = Number(pagina);
+    const lim = Number(limite);
+    const Pular = (pag - 1) * lim;
     const pacientes = await prisma.paciente.findMany({
       where: cpf? {cpf: cpf} : {},
       skip: Pular,
@@ -36,7 +37,7 @@ app.get('/pacientes', async (req, res) => {
     });
   }catch (erro) {
     console.error(erro);
-    res.status(500).json({erro: 'erro ao buscar pacientes.'};)
+    res.status(500).json({erro: 'erro ao buscar pacientes.'});
   }
 
 });
