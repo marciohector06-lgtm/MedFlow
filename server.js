@@ -1,4 +1,3 @@
-require ('dotenv').config();
 const express = require('express');
 const cors = require('cors');
 const { PrismaClient } = require('@prisma/client');
@@ -14,149 +13,155 @@ app.get('/', (req, res) => {
 });
 
 // --- PACIENTES ---
+app.post('/pacientes', async (req, res) => {
+  try {
+    const { nome, cpf, telefone } = req.body;
+    
+    // Regra: Sem campo vazio ou só com espaços
+    if (!nome || nome.trim() === "") return res.status(400).json({ erro: 'NOME_OBRIGATORIO' });
+    if (!cpf || cpf.trim().length !== 11) return res.status(400).json({ erro: 'CPF_INVALIDO' });
+    if (!telefone || telefone.trim() === "") return res.status(400).json({ erro: 'TELEFONE_OBRIGATORIO' });
+    
+    const novoPaciente = await prisma.paciente.create({
+      data: { nome: nome.trim(), cpf: cpf.trim(), telefone: telefone.trim() }
+    });
+    res.status(201).json(novoPaciente);
+  } catch (erro) {
+    res.status(500).json({ erro: 'ERRO_AO_CADASTRAR_PACIENTE' });
+  }
+});
+
 app.get('/pacientes', async (req, res) => {
   try {
     const { cpf, pagina = 1, limite = 10 } = req.query;
     const pag = Number(pagina);
     const lim = Number(limite);
-    const Pular = (pag - 1) * lim;
+    const pular = (pag - 1) * lim;
+    
     const pacientes = await prisma.paciente.findMany({
-      where: cpf? {cpf: cpf} : {},
-      skip: Pular,
+      where: cpf ? { cpf: cpf } : {},
+      skip: pular,
       take: lim,
-
     });
+    
     const totalRegistros = await prisma.paciente.count({
-     where: cpf ? {cpf: cpf } : {}
+      where: cpf ? { cpf: cpf } : {}
     });
+    
     res.json({
       dados: pacientes,
       paginaAtual: pag,
       totalPaginas: Math.ceil(totalRegistros / lim),
       totalRegistros: totalRegistros
     });
-  }catch (erro) {
-    console.error(erro);
-    res.status(500).json({erro: 'erro ao buscar pacientes.'});
-  }
-
-});
-
-app.post('/pacientes', async (req, res) => {
-  try {
-    const { nome, cpf, telefone } = req.body;
-    if (!nome || !cpf || !telefone){
-      return res.status(400).json({erro: 'Faltam dados! Nome, CPF e telefone são obrigatorios.'})
-    }
-    if (cpf.length !== 11) {
-      return res.status(400).json({erro: 'CPF invalido! digite apenas os 11 numeroe do CPF!!'})
-    }
-    const novoPaciente = await prisma.paciente.create({
-      data: {nome, cpf, telefone }
-    });
-    res.status(201).json(novoPaciente);
-  }catch (erro){
-    console.error(erro);
-    res.status(500).json({erro: 'Erro ao cadastrar. O CPF ja existe no banco ?'});
-  }
-});
-
-// --- PROCEDIMENTOS ---
-app.post('/procedimentos', async (req, res) => {
-  try {
-    const { nome, tempo_estimado } = req.body;
-    const novoProcedimento = await prisma.procedimento.create({
-      data: { nome, tempo_estimado }
-    });
-    res.status(201).json(novoProcedimento);
   } catch (erro) {
-    console.error(erro);
-    res.status(500).json({ erro: 'Erro ao cadastrar procedimento.' });
+    res.status(500).json({ erro: 'Erro ao buscar pacientes.' });
   }
 });
 
 // --- ATENDIMENTOS ---
-app.get('/atendimentos', async (req, res) => {
-  try {
-    const { status } = req.query;
-    const atendimentos = await prisma.atendimento.findMany({
-      where: status ? { status: status } : {},
-      include: {
-        paciente: true,
-        procedimento: true
-      }
-    });
-    res.json(atendimentos);
-  } catch (erro) {
-    console.error(erro);
-    res.status(500).json({ erro: 'Erro ao buscar atendimentos.' });
-  }
-});
-
-// ROTA POST DE ATENDIMENTOS COM VALIDAÇÃO
 app.post('/atendimentos', async (req, res) => {
   try {
-    const { tipo, prioridade, paciente_id, procedimento_id } = req.body;
+    const { tipo, paciente_id, procedimento_id, numero_guia, convenio } = req.body;
 
-    if (!tipo || !paciente_id || !procedimento_id) {
-      return res.status(400).json({ erro: 'Faltam dados! Tipo, paciente_id e procedimento_id são obrigatórios.' });
+    // Travas de segurança essenciais
+    if (!paciente_id) return res.status(400).json({ erro: 'PACIENTE_ID_OBRIGATORIO' });
+    if (!procedimento_id) return res.status(400).json({ erro: 'PROCEDIMENTO_ID_OBRIGATORIO' });
+    if (!convenio || convenio.trim() === "") return res.status(400).json({ erro: 'CONVENIO_OBRIGATORIO' });
+
+    // Regra de Negócio Sênior: Se não for Particular, a Guia/Carteirinha é obrigatória
+    if (convenio.toUpperCase() !== 'PARTICULAR') {
+      if (!numero_guia || numero_guia.trim() === "") {
+        return res.status(400).json({ erro: 'NUMERO_GUIA_OBRIGATORIO_PARA_CONVENIO' });
+      }
     }
 
     const novoAtendimento = await prisma.atendimento.create({
       data: {
         tipo,
-        prioridade: prioridade || false,
         paciente_id,
-        procedimento_id
+        procedimento_id,
+        numero_guia: numero_guia ? numero_guia.trim() : null,
+        convenio: convenio.trim().toUpperCase(),
+        status: 'AGUARDANDO'
       }
     });
-    
     res.status(201).json(novoAtendimento);
   } catch (erro) {
-    console.error(erro);
-    res.status(500).json({ erro: 'Erro ao criar atendimento. Verifique se os IDs do paciente e procedimento estão corretos.' });
+    res.status(500).json({ erro: 'ERRO_AO_CRIAR_ATENDIMENTO' });
   }
 });
-app.put('/atendimentos/:id', async (req, res) => {
+
+app.get('/atendimentos', async (req, res) => {
+  try {
+    const { status, pagina = 1, limite = 10 } = req.query;
+    const pag = Number(pagina);
+    const lim = Number(limite);
+    const pular = (pag - 1) * lim;
+
+    const atendimentos = await prisma.atendimento.findMany({
+      where: status ? { status: status } : {},
+      skip: pular,
+      take: lim,
+      include: {
+        paciente: true,
+        procedimento: true
+      }
+    });
+
+    const totalRegistros = await prisma.atendimento.count({
+      where: status ? { status: status } : {}
+    });
+
+    res.json({
+      dados: atendimentos,
+      paginaAtual: pag,
+      totalPaginas: Math.ceil(totalRegistros / lim),
+      totalRegistros: totalRegistros
+    });
+  } catch (erro) {
+    res.status(500).json({ erro: 'Erro ao buscar atendimentos.' });
+  }
+});
+
+// --- FILA AUTOMÁTICA ---
+app.put('/atendimentos/:id/finalizar', async (req, res) => {
   try {
     const { id } = req.params;
-    const { medico_id, status } = req.body;
-    const atendimentoAtualizado = await prisma.atendimento.update({
+
+    await prisma.atendimento.update({
       where: { id: parseInt(id) },
-      data: { medico_id, status }
+      data: { status: 'FINALIZADO' }
     });
-    res.json(atendimentoAtualizado);
-  } catch (erro) {
-    console.error(erro);
-    res.status(500).json({ erro: 'Erro ao atualizar atendimento.' });
-  }
-});
 
-// --- USUÁRIOS ---
-app.post('/usuarios', async (req, res) => {
-  try {
-    const { nome, email, senha, cargo } = req.body;
-    const novoUsuario = await prisma.usuario.create({
-      data: { nome, email, senha, cargo }
+    const filaAguardando = await prisma.atendimento.findMany({
+      where: { status: 'AGUARDANDO' },
+      orderBy: { id: 'asc' }, 
+      include: { paciente: true } 
     });
-    res.status(201).json(novoUsuario);
-  } catch (erro) {
-    console.error(erro);
-    res.status(500).json({ erro: 'Erro ao cadastrar usuário.' });
-  }
-});
 
-app.get('/usuarios', async (req, res) => {
-  try {
-    const usuarios = await prisma.usuario.findMany();
-    res.json(usuarios);
+    if (filaAguardando.length > 0) {
+      const proximo = filaAguardando[0];
+      await prisma.atendimento.update({
+        where: { id: proximo.id },
+        data: { status: 'CHAMADO' }
+      });
+      
+      console.log(`[SISTEMA] 📺 Paciente ${proximo.paciente.nome} CHAMADO!`);
+
+      for (let i = 1; i < filaAguardando.length; i++) {
+        const pacienteEspera = filaAguardando[i];
+        console.log(`[ZAP] 📱 -> ${pacienteEspera.paciente.telefone}: Faltam ${i} pessoas.`);
+      }
+    }
+
+    res.status(200).json({ mensagem: "OK" });
   } catch (erro) {
-    console.error(erro);
-    res.status(500).json({ erro: 'Erro ao buscar usuários.' });
+    res.status(500).json({ erro: "Erro na atualização da fila." });
   }
 });
 
 const PORTA = 3333;
 app.listen(PORTA, () => {
-  console.log(`🚀 Servidor voando na porta http://localhost:${PORTA}`);
+  console.log(`🚀 Servidor MedFlow rodando em http://localhost:${PORTA}`);
 });
