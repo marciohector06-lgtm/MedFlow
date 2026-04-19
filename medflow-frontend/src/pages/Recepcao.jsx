@@ -1,11 +1,15 @@
 import { useState, useEffect } from 'react';
 import { api } from '../services/api';
 import ModalCadastro from '../components/ModalCadastro';
+import { io } from 'socket.io-client';
+
+const socket = io('http://localhost:3333');
 
 export default function Recepcao() {
   const [atendimentos, setAtendimentos] = useState([]);
   const [abaAtiva, setAbaAtiva] = useState('recepcao');
   const [showModal, setShowModal] = useState(false);
+  const [busca, setBusca] = useState('');
 
   const carregarDadosDoBanco = async () => {
     try {
@@ -20,7 +24,23 @@ export default function Recepcao() {
 
   useEffect(() => {
     carregarDadosDoBanco();
+
+    socket.on('atualizaKanban', () => {
+      carregarDadosDoBanco();
+    });
+
+    return () => {
+      socket.off('atualizaKanban');
+    };
   }, []);
+
+  const pacientesFiltrados = atendimentos.filter((atendimento) => {
+    const nome = atendimento.paciente?.nome?.toLowerCase() || '';
+    const cpf = atendimento.paciente?.cpf || '';
+    const termoBusca = busca.toLowerCase();
+    
+    return nome.includes(termoBusca) || cpf.includes(termoBusca);
+  });
 
   return (
     <div className="admin-container">
@@ -41,20 +61,38 @@ export default function Recepcao() {
 
         {abaAtiva === 'recepcao' && (
           <section className="panel">
-            <button className="btn-new" onClick={() => setShowModal(true)}>+ Novo Agendamento</button>
+            <div style={{ display: 'flex', gap: '15px', marginBottom: '15px' }}>
+              <button className="btn-new" onClick={() => setShowModal(true)}>+ Novo Agendamento</button>
+              <input 
+                type="text" 
+                placeholder="Buscar por Nome ou CPF..." 
+                value={busca}
+                onChange={(e) => setBusca(e.target.value)}
+                style={{ padding: '8px', width: '300px', borderRadius: '4px', border: '1px solid #ccc' }}
+              />
+            </div>
+            
             <table className="medflow-table">
               <thead>
                 <tr><th>Ficha</th><th>Paciente</th><th>Convênio</th><th>Status</th></tr>
               </thead>
               <tbody>
-                {atendimentos.map(item => (
-                  <tr key={item.id}>
-                    <td>#{item.id}</td>
-                    <td>{item.paciente?.nome}</td>
-                    <td>{item.convenio}</td>
-                    <td><span className="status-tag">{item.status}</span></td>
+                {pacientesFiltrados.length > 0 ? (
+                  pacientesFiltrados.map(item => (
+                    <tr key={item.id}>
+                      <td>#{item.id.substring(0, 5).toUpperCase()}</td>
+                      <td>{item.paciente?.nome}</td>
+                      <td>{item.convenio || 'PARTICULAR'}</td>
+                      <td><span className="status-tag">{item.status}</span></td>
+                    </tr>
+                  ))
+                ) : (
+                  <tr>
+                    <td colSpan="4" style={{ textAlign: 'center', padding: '20px', color: '#666' }}>
+                      Nenhum paciente na fila.
+                    </td>
                   </tr>
-                ))}
+                )}
               </tbody>
             </table>
           </section>
