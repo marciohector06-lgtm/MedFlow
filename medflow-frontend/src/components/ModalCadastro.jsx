@@ -1,112 +1,89 @@
 import { useState } from 'react';
-import { api, viaCep } from '../services/api';
-import { calcularRegrasIdade } from '../utils/regrasIdade';
+import { api } from '../services/api';
 
 export default function ModalCadastro({ fecharModal, atualizarFila }) {
-  const [novoAtendimento, setNovoAtendimento] = useState({
-    nome: '', cpf: '', telefone: '', nascimento: '',
-    convenio: 'PARTICULAR', carteirinha: '', sexo: '', 
-    nome_mae: '', email: '', cep: '', endereco: '', responsavel: '' 
-  });
+  const [nome, setNome] = useState('');
+  const [cpf, setCpf] = useState('');
+  const [dataNascimento, setDataNascimento] = useState('');
+  const [sexo, setSexo] = useState('');
+  const [email, setEmail] = useState('');
+  const [whatsapp, setWhatsapp] = useState('');
+  const [cep, setCep] = useState('');
+  const [endereco, setEndereco] = useState('');
+  const [nomeMae, setNomeMae] = useState('');
+  const [responsavel, setResponsavel] = useState('');
+  const [convenio, setConvenio] = useState('PARTICULAR');
+  const [numCarteirinha, setNumCarteirinha] = useState('');
 
-  const { precisaResponsavel, ehMenor } = calcularRegrasIdade(novoAtendimento.nascimento);
-
-  const buscarCEP = async (valor) => {
-    setNovoAtendimento({ ...novoAtendimento, cep: valor });
-    if (valor.length === 8) {
-      try {
-        const resposta = await viaCep.get(`${valor}/json/`);
-        if (!resposta.data.erro) {
-          setNovoAtendimento(prev => ({
-            ...prev,
-            endereco: `${resposta.data.logradouro}, ${resposta.data.bairro} - ${resposta.data.localidade}`
-          }));
-        }
-      } catch (err) {
-        console.log("CEP não encontrado");
-      }
-    }
-  };
-
-  const finalizarCadastro = async (e) => {
+  const handleSalvar = async (e) => {
     e.preventDefault();
-
-    if (ehMenor && !novoAtendimento.nome_mae) {
-      alert("Atenção: Nome da mãe é obrigatório para menores!");
-      return;
-    }
-
     try {
-      // Usando a API que configuramos no Service
-      const pac = await api.post('/pacientes', {
-        ...novoAtendimento,
-        data_nascimento: novoAtendimento.nascimento
-      });
-
       await api.post('/atendimentos', {
-        paciente_id: pac.data.id,
-        tipo: 'Consulta',
-        procedimento_id: 1, 
-        convenio: novoAtendimento.convenio || "PARTICULAR",
-        numero_guia: novoAtendimento.carteirinha,
-        status: 'AGUARDANDO'
+        nome,
+        cpf,
+        data_nascimento: dataNascimento ? new Date(dataNascimento).toISOString() : new Date('1990-01-01T00:00:00Z').toISOString(),
+        sexo: sexo || 'M',
+        whatsapp: whatsapp || '00000000000',
+        cep: cep || '00000-000',
+        endereco: endereco || 'Endereço não informado',
+        convenio
       });
-
-      alert("Sucesso! Paciente está na fila.");
-      fecharModal(); // Fecha a janela usando a função que veio do App.jsx
-      atualizarFila(); // Atualiza a tabela do App.jsx
-    } catch (err) {
-      alert("Erro ao salvar. Verifique se o CPF está correto.");
+      atualizarFila();
+      fecharModal();
+    } catch (error) {
+      alert('Erro ao salvar o paciente. Verifique se o CPF já existe.');
     }
   };
 
   return (
-    <div className="modal-overlay">
-      <div className="modal-content">
-        <h3>📄 Cadastro do Paciente</h3>
-        <form onSubmit={finalizarCadastro} className="form-grid">
-          <input type="text" placeholder="Nome" required onChange={e => setNovoAtendimento({...novoAtendimento, nome: e.target.value})} />
-          <input type="text" placeholder="CPF" required maxLength="11" onChange={e => setNovoAtendimento({...novoAtendimento, cpf: e.target.value})} />
-          <input type="date" required onChange={e => setNovoAtendimento({...novoAtendimento, nascimento: e.target.value})} />
-          
-          <select required onChange={e => setNovoAtendimento({...novoAtendimento, sexo: e.target.value})}>
-            <option value="">Sexo...</option>
-            <option value="M">Masculino</option>
-            <option value="F">Feminino</option>
-          </select>
+    <div style={overlayStyle}>
+      <div style={modalStyle}>
+        <h2 style={{ marginBottom: '20px', borderBottom: '1px solid #eee', paddingBottom: '10px' }}>
+          📄 Cadastro do Paciente
+        </h2>
+        
+        <form onSubmit={handleSalvar}>
+          <div style={gridStyle}>
+            <input type="text" placeholder="Nome Completo" value={nome} onChange={e => setNome(e.target.value)} required style={inputStyle} />
+            <input type="text" placeholder="CPF" value={cpf} onChange={e => setCpf(e.target.value)} required style={inputStyle} />
+            
+            <input type="date" value={dataNascimento} onChange={e => setDataNascimento(e.target.value)} required style={inputStyle} />
+            <select value={sexo} onChange={e => setSexo(e.target.value)} required style={inputStyle}>
+              <option value="">Sexo...</option>
+              <option value="M">Masculino</option>
+              <option value="F">Feminino</option>
+            </select>
+            
+            <input type="email" placeholder="E-mail" value={email} onChange={e => setEmail(e.target.value)} style={inputStyle} />
+            <input type="text" placeholder="WhatsApp" value={whatsapp} onChange={e => setWhatsapp(e.target.value)} required style={inputStyle} />
+            
+            <input type="text" placeholder="CEP" value={cep} onChange={e => setCep(e.target.value)} required style={inputStyle} />
+            <input type="text" placeholder="Endereço" value={endereco} onChange={e => setEndereco(e.target.value)} required style={inputStyle} />
+            
+            <input type="text" placeholder="Nome da Mãe" value={nomeMae} onChange={e => setNomeMae(e.target.value)} style={inputStyle} />
+            <input type="text" placeholder="Responsável (Opcional)" value={responsavel} onChange={e => setResponsavel(e.target.value)} style={inputStyle} />
+            
+            <select value={convenio} onChange={e => setConvenio(e.target.value)} style={inputStyle}>
+              <option value="PARTICULAR">PARTICULAR</option>
+              <option value="UNIMED">UNIMED</option>
+              <option value="BRADESCO">BRADESCO SAÚDE</option>
+            </select>
+            <input type="text" placeholder="Nº Carteirinha" value={numCarteirinha} onChange={e => setNumCarteirinha(e.target.value)} style={inputStyle} />
+          </div>
 
-          <input type="email" placeholder="E-mail" onChange={e => setNovoAtendimento({...novoAtendimento, email: e.target.value})} />
-          <input type="text" placeholder="WhatsApp" onChange={e => setNovoAtendimento({...novoAtendimento, telefone: e.target.value})} />
-          
-          <input type="text" placeholder="CEP" maxLength="8" onChange={e => buscarCEP(e.target.value)} />
-          <input type="text" placeholder="Endereço" value={novoAtendimento.endereco} onChange={e => setNovoAtendimento({...novoAtendimento, endereco: e.target.value})} />
-
-          <input 
-            type="text" 
-            placeholder={ehMenor ? "Nome da Mãe (Obrigatório)" : "Nome da Mãe"} 
-            required={ehMenor}
-            onChange={e => setNovoAtendimento({...novoAtendimento, nome_mae: e.target.value})} 
-          />
-
-          <input 
-            type="text" 
-            placeholder={precisaResponsavel ? "Responsável (Obrigatório)" : "Responsável (Opcional)"} 
-            required={precisaResponsavel}
-            onChange={e => setNovoAtendimento({...novoAtendimento, responsavel: e.target.value})} 
-          />
-
-          <select onChange={e => setNovoAtendimento({...novoAtendimento, convenio: e.target.value})}>
-            <option value="PARTICULAR">PARTICULAR</option>
-            <option value="UNIMED">UNIMED</option>
-          </select>
-          <input type="text" placeholder="Nº Carteirinha" onChange={e => setNovoAtendimento({...novoAtendimento, carteirinha: e.target.value})} />
-
-          <div className="modal-actions">
-            <button type="button" onClick={fecharModal}>Sair</button>
-            <button type="submit" className="btn-save">Salvar</button>
+          <div style={{ display: 'flex', justifyContent: 'flex-end', gap: '10px', marginTop: '20px' }}>
+            <button type="button" onClick={fecharModal} style={btnSairStyle}>Sair</button>
+            <button type="submit" style={btnSalvarStyle}>Salvar</button>
           </div>
         </form>
       </div>
     </div>
   );
 }
+
+const overlayStyle = { position: 'fixed', top: 0, left: 0, right: 0, bottom: 0, backgroundColor: 'rgba(0,0,0,0.5)', display: 'flex', justifyContent: 'center', alignItems: 'center', zIndex: 1000 };
+const modalStyle = { backgroundColor: 'white', padding: '30px', borderRadius: '8px', width: '700px', boxShadow: '0 4px 15px rgba(0,0,0,0.2)' };
+const gridStyle = { display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '15px' };
+const inputStyle = { padding: '10px', border: '1px solid #ccc', borderRadius: '4px', width: '100%', boxSizing: 'border-box' };
+const btnSairStyle = { padding: '10px 20px', cursor: 'pointer', border: '1px solid #ccc', borderRadius: '4px', backgroundColor: '#fff' };
+const btnSalvarStyle = { padding: '10px 20px', cursor: 'pointer', border: 'none', borderRadius: '4px', backgroundColor: '#3498db', color: 'white', fontWeight: 'bold' };

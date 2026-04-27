@@ -1,0 +1,65 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+model Usuario {
+  id        String   @id @default(uuid())
+  nome      String
+  email     String   @unique
+  senha     String
+  cargo     String   // ADMIN, RECEPCIONISTA, MEDICO
+  createdAt DateTime @default(now())
+}
+
+model Paciente {
+  id                String   @id @default(uuid())
+  nome              String
+  cpf               String   @unique
+  data_nascimento   DateTime
+  sexo              String
+  whatsapp          String
+  
+  // Endereço (ViaCEP)
+  cep               String
+  endereco          String
+  numero            String
+  bairro            String
+  cidade            String
+  uf                String
+
+  // Regras do TCC (Menores/Idosos)
+  nome_responsavel  String?
+  cpf_responsavel   String?
+  parentesco        String?
+  nome_mae          String?  
+
+  atendimentos      Atendimento[]
+  createdAt         DateTime @default(now())
+}
+
+model Atendimento {
+  id                String   @id @default(uuid())
+  pacienteId        String
+  paciente          Paciente @relation(fields: [pacienteId], references: [id])
+
+  // Motor do Kanban
+  status            String   @default("AGUARDANDO") 
+  prioridade        String   @default("NORMAL")
+
+  // Cronômetro de Atrasos
+  hora_chegada      DateTime @default(now())
+  hora_inicio_atend DateTime?
+  hora_finalizacao  DateTime?
+
+  // Prontuário Médico
+  evolucao_clinica  String?
+  exames_solicitados String?
+
+  createdAt         DateTime @default(now())
+  updatedAt         DateTime @updatedAt
+}
