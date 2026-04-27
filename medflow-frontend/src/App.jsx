@@ -13,7 +13,10 @@ function App() {
         <Route path="/" element={<Login />} />
         
         <Route path="/recepcao" element={<Recepcao />} />
-        <Route path="/PainelMedico" element={<PainelMedico />} />
+        
+        {/* 🔥 O ERRO ESTAVA AQUI! Agora a rota chama '/medico' do jeito que o Login espera */}
+        <Route path="/medico" element={<PainelMedico />} />
+        
         <Route path="/Triagem" element={<Triagem />} />
         <Route path="/Exames" element={<Exames />} />
 

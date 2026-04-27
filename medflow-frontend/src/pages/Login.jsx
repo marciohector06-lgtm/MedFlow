@@ -4,19 +4,22 @@ import { useNavigate } from 'react-router-dom';
 export default function Login() {
   const [email, setEmail] = useState('');
   const [senha, setSenha] = useState('');
+  const [perfil, setPerfil] = useState('recepcao');
   const navigate = useNavigate();
 
   const handleLogin = (e) => {
-    e.preventDefault(); // Evita que a página recarregue do zero
+    e.preventDefault(); 
 
-    // Por enquanto, vamos simular o login para você conseguir testar o visual!
-    // Na Meta 1 do Backend, vamos fazer isso consultar o PostgreSQL de verdade.
-    
-    // Salva um "crachá" fake no navegador só para a Recepção saber quem logou
-    localStorage.setItem('@MedFlow:usuario', JSON.stringify({ nome: 'Márcio', cargo: 'ADMIN' }));
-
-    // O comando mágico que te joga lá pra tela do Kanban!
-    navigate('/recepcao');
+    // Verifica o perfil escolhido e manda para a tela certa
+    if (perfil === 'medico') {
+      // AJUSTE: cargo salvo como 'medico' (minúsculo e sem acento) para não dar erro na trava de segurança da tela
+      localStorage.setItem('@MedFlow:usuario', JSON.stringify({ nome: 'Dr. Silva', cargo: 'medico' }));
+      navigate('/medico');
+    } else {
+      // AJUSTE: cargo salvo como 'recepcao' para manter o mesmo padrão seguro
+      localStorage.setItem('@MedFlow:usuario', JSON.stringify({ nome: 'Márcio', cargo: 'recepcao' }));
+      navigate('/recepcao');
+    }
   };
 
   return (
@@ -48,7 +51,19 @@ export default function Login() {
             />
           </div>
 
-          <button type="submit" className="btn-login">
+          <div className="input-group">
+            <label>Perfil de Acesso</label>
+            <select 
+              value={perfil} 
+              onChange={(e) => setPerfil(e.target.value)}
+              style={{ width: '100%', padding: '10px', marginTop: '5px', borderRadius: '4px', border: '1px solid #ccc' }}
+            >
+              <option value="recepcao">Recepção</option>
+              <option value="medico">Médico</option>
+            </select>
+          </div>
+
+          <button type="submit" className="btn-login" style={{ marginTop: '15px' }}>
             Entrar no Sistema
           </button>
         </form>

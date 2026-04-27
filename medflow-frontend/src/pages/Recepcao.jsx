@@ -1,4 +1,5 @@
 import { useState, useEffect } from 'react';
+import { useNavigate } from 'react-router-dom'; // Adicionado para navegar
 import { api } from '../services/api';
 import ModalCadastro from '../components/ModalCadastro';
 import { io } from 'socket.io-client';
@@ -6,10 +7,20 @@ import { io } from 'socket.io-client';
 const socket = io('http://localhost:3333');
 
 export default function Recepcao() {
+  const navigate = useNavigate(); // Inicializa o navegador
   const [atendimentos, setAtendimentos] = useState([]);
   const [abaAtiva, setAbaAtiva] = useState('recepcao');
   const [showModal, setShowModal] = useState(false);
   const [busca, setBusca] = useState('');
+
+  // 1. Puxa os dados de quem fez o login
+  const usuarioLogado = JSON.parse(localStorage.getItem('@MedFlow:usuario')) || { nome: 'Márcio Henrique' };
+
+  // 2. Função para sair do sistema
+  const fazerLogout = () => {
+    localStorage.removeItem('@MedFlow:usuario');
+    navigate('/');
+  };
 
   const carregarDadosDoBanco = async () => {
     try {
@@ -50,13 +61,16 @@ export default function Recepcao() {
           <button onClick={() => setAbaAtiva('recepcao')} className={abaAtiva === 'recepcao' ? 'active' : ''}>📋 Atendimento</button>
           <button onClick={() => setAbaAtiva('faturamento')} className={abaAtiva === 'faturamento' ? 'active' : ''}>💰 Faturamento</button>
           <button onClick={() => setAbaAtiva('relatorios')} className={abaAtiva === 'relatorios' ? 'active' : ''}>📊 Relatórios</button>
+          
+          {/* Botão de Sair no final do menu lateral */}
+          <button onClick={fazerLogout} style={{ marginTop: 'auto', color: '#ff7675' }}>🚪 Sair do Sistema</button>
         </nav>
       </aside>
 
       <main className="content">
         <header className="content-header">
           <h1>{abaAtiva === 'recepcao' ? 'RECEPÇÃO' : 'FATURAMENTO'}</h1>
-          <div className="user-info">Recepcionista: <strong>Márcio Henrique</strong></div>
+          <div className="user-info">Recepcionista: <strong>{usuarioLogado.nome}</strong></div>
         </header>
 
         {abaAtiva === 'recepcao' && (

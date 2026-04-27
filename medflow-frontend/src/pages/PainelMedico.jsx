@@ -4,15 +4,15 @@ import { api } from '../services/api';
 export default function PainelMedico() {
   const [fila, setFila] = useState([]);
   const [pacienteAtual, setPacienteAtual] = useState(null);
-  const [evolucaoClinica, setEvolucaoClinica] = useState('');
+  const [sintomas, setSintomas] = useState('');
+  const [diagnostico, setDiagnostico] = useState('');
+  const [prescricao, setPrescricao] = useState('');
 
-  // Busca apenas quem está AGUARDANDO na recepção
   const carregarFila = async () => {
     try {
       const res = await api.get('/atendimentos');
       const listaTotal = res.data.dados || res.data || [];
-      const pacientesEsperando = listaTotal.filter(item => item.status === 'AGUARDANDO');
-      setFila(pacientesEsperando);
+      setFila(listaTotal);
     } catch (e) {
       console.log("Erro ao carregar a fila do médico");
     }
@@ -24,10 +24,11 @@ export default function PainelMedico() {
 
   const chamarPaciente = (paciente) => {
     setPacienteAtual(paciente);
-    setEvolucaoClinica(''); // Limpa o prontuário para o novo paciente
+    setSintomas('');
+    setDiagnostico('');
+    setPrescricao('');
   };
 
-  // --- FLUXO DE DECISÃO DO MÉDICO (Regras de Negócio do DRS) ---
   const finalizarAtendimento = () => {
     alert("✅ Consulta finalizada com sucesso!");
     setPacienteAtual(null);
@@ -62,10 +63,9 @@ export default function PainelMedico() {
           <div className="user-info">Médico: <strong>Dr. Márcio Henrique</strong></div>
         </header>
 
-        {/* MODO 1: FILA DE ESPERA */}
         {!pacienteAtual && (
           <section className="panel">
-            <h3>Pacientes Aguardando Triagem</h3>
+            <h3>Pacientes Aguardando Atendimento</h3>
             <table className="medflow-table">
               <thead>
                 <tr>
@@ -82,7 +82,7 @@ export default function PainelMedico() {
                   fila.map(item => (
                     <tr key={item.id}>
                       <td>#{item.id}</td>
-                      <td>{item.paciente?.nome || 'Paciente Externo'}</td>
+                      <td>{item.paciente?.nome || item.nome || 'Paciente Externo'}</td>
                       <td>{item.convenio}</td>
                       <td>
                         <button className="btn-save" onClick={() => chamarPaciente(item)}>
@@ -97,28 +97,50 @@ export default function PainelMedico() {
           </section>
         )}
 
-        {/* MODO 2: PRONTUÁRIO DO PACIENTE */}
         {pacienteAtual && (
           <section className="panel">
             <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '20px' }}>
-              <h2>Atendendo: {pacienteAtual.paciente?.nome || 'Paciente Externo'}</h2>
+              <h2>Atendendo: {pacienteAtual.paciente?.nome || pacienteAtual.nome || 'Paciente Externo'}</h2>
               <span className="status-tag" style={{ background: '#ffc107', color: '#000' }}>EM ATENDIMENTO</span>
             </div>
 
             <div className="form-grid" style={{ gridTemplateColumns: '1fr' }}>
+              
               <div className="input-group">
-                <label style={{ fontWeight: 'bold', marginBottom: '8px', display: 'block' }}>Evolução Clínica (Anamnese)</label>
+                <label style={{ fontWeight: 'bold', marginBottom: '8px', display: 'block' }}>Sintomas (Anamnese)</label>
                 <textarea 
-                  rows="8" 
-                  placeholder="Descreva os sintomas, queixas e observações médicas..."
-                  value={evolucaoClinica}
-                  onChange={(e) => setEvolucaoClinica(e.target.value)}
+                  rows="3" 
+                  placeholder="Descreva os Sintomas e queixas do paciente..."
+                  value={sintomas}
+                  onChange={(e) => setSintomas(e.target.value)}
                   style={{ width: '100%', padding: '12px', borderRadius: '8px', border: '1px solid #ccc', resize: 'vertical' }}
                 />
               </div>
+
+              <div className="input-group" style={{ marginTop: '15px' }}>
+                <label style={{ fontWeight: 'bold', marginBottom: '8px', display: 'block' }}>Diagnóstico</label>
+                <textarea 
+                  rows="3" 
+                  placeholder="Qual o Diagnóstico médico..."
+                  value={diagnostico}
+                  onChange={(e) => setDiagnostico(e.target.value)}
+                  style={{ width: '100%', padding: '12px', borderRadius: '8px', border: '1px solid #ccc', resize: 'vertical' }}
+                />
+              </div>
+
+              <div className="input-group" style={{ marginTop: '15px' }}>
+                <label style={{ fontWeight: 'bold', marginBottom: '8px', display: 'block' }}>Prescrição Médica</label>
+                <textarea 
+                  rows="3" 
+                  placeholder="Prescrição de medicamentos e recomendações..."
+                  value={prescricao}
+                  onChange={(e) => setPrescricao(e.target.value)}
+                  style={{ width: '100%', padding: '12px', borderRadius: '8px', border: '1px solid #ccc', resize: 'vertical' }}
+                />
+              </div>
+
             </div>
 
-            {/* BOTÕES DE FLUXO (SADT, Retorno, Finalizar) */}
             <div style={{ display: 'flex', gap: '15px', marginTop: '30px', flexWrap: 'wrap' }}>
               <button 
                 onClick={solicitarExame} 
@@ -135,7 +157,7 @@ export default function PainelMedico() {
               <button 
                 onClick={finalizarAtendimento} 
                 style={{ background: '#28a745', color: '#fff', padding: '12px 20px', border: 'none', borderRadius: '5px', cursor: 'pointer', fontWeight: 'bold', marginLeft: 'auto' }}>
-                ✅ Finalizar Consulta
+                ✅ Salvar e Finalizar Consulta
               </button>
             </div>
           </section>
