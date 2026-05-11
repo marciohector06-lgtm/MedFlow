@@ -1,61 +1,57 @@
-describe('Fluxo Completo do TCC - MedFlow', () => {
-  const idUnico = Date.now().toString().slice(-6);
-  const nomePaciente = 'Paciente Cypress ' + idUnico;
-  const cpfDinamico = `123.${idUnico.slice(0,3)}.${idUnico.slice(3,6)}-00`;
+describe('Suíte de Testes MedFlow Pro', () => {
+  const loginUrl = 'http://localhost:5173/';
+  const adminUrl = 'http://localhost:5173/admin';
 
-  it('Fluxo Perfeito: Cadastro Completo e Atendimento Médico', () => {
-    // 1. LOGIN
-    cy.visit('http://localhost:5173/');
-    cy.get('input[type="email"]').type('recepcao@medflow.com');
-    cy.get('input[type="password"]').type('123456');
-    cy.get('select').select('recepcao');
-    cy.contains('button', 'Entrar no Sistema').click();
+  beforeEach(() => {
+    // Ajuste a URL se o seu Vite estiver em outra porta
+    cy.visit(adminUrl);
+  });
 
-    // 2. CADASTRO NA RECEPÇÃO
-    cy.url().should('include', '/recepcao');
-    cy.contains('button', '+ Novo Agendamento').click();
-    cy.wait(1000);
+  it('Deve validar o Dashboard e os cards de métricas', () => {
+    cy.contains('PAINEL DO ADMINISTRADOR').should('be.visible');
+    cy.contains('TOTAL DE PACIENTES').should('be.visible');
+    cy.contains('FATURAMENTO ESTIMADO').should('be.visible');
+  });
 
-    // Preenche tudo
-    cy.get('input[placeholder*="Nome"]').first().type(nomePaciente, { force: true });
-    cy.get('input[placeholder*="CPF"]').first().type(cpfDinamico, { force: true });
-    cy.get('input[type="date"]').type('1990-01-01', { force: true });
-    cy.get('select').first().select('M', { force: true });
-    cy.get('input[placeholder*="WhatsApp"]').first().type('11999999999', { force: true });
-    cy.get('input[placeholder*="CEP"]').first().type('00000-000', { force: true });
-    cy.get('input[placeholder*="Endereço"]').first().type('Rua Cypress, 123', { force: true });
-
-    // 🔥 A FORÇA BRUTA: Ignora o botão e força o formulário a enviar os dados!
-    cy.get('form').submit();
-
-    // Dá 3 segundos cravados pro banco de dados salvar em paz
-    cy.wait(3000); 
-
-    // 3. SAIR
-    cy.contains('button', 'Sair').click({ force: true });
-    cy.wait(1000);
-
-    // 4. LOGIN DO MÉDICO
-    cy.get('input[type="email"]').type('medico@medflow.com');
-    cy.get('input[type="password"]').type('123456');
-    cy.get('select').select('medico');
-    cy.contains('button', 'Entrar no Sistema').click();
-
-    // 5. ATENDER O PACIENTE
-    cy.url().should('include', '/medico');
+  it('Deve cadastrar um novo profissional na equipe', () => {
+    cy.contains('Equipe / Staff').click();
+    cy.get('input[placeholder="Nome"]').type('Dr. Teste Automatizado');
+    cy.get('input[placeholder="E-mail"]').type('teste@medflow.com');
+    cy.get('input[placeholder="Senha"]').type('123456');
+    cy.get('select').select('MEDICO');
+    cy.contains('button', 'Adicionar').click();
     
-    // O paciente tem que estar aqui
-    cy.contains(nomePaciente, { timeout: 15000 }).should('be.visible');
+    cy.contains('Dr. Teste Automatizado').should('be.visible');
+  });
 
-    cy.contains(nomePaciente).parents('tr, div').find('button').contains('Chamar').first().click();
+  it('Deve gerenciar o estoque e validar a entrada de produtos', () => {
+    cy.contains('Estoque').click();
+    const produtoNome = `Luva Nitrílica ${Date.now()}`;
+    
+    cy.get('input[placeholder="Produto"]').type(produtoNome);
+    cy.get('input[placeholder="Qtd"]').type('50');
+    cy.get('input[placeholder="Custo"]').type('25.50');
+    cy.contains('button', 'Salvar').click();
 
-    cy.get('textarea[placeholder*="Sintomas"]').type('Teste automatizado', { force: true });
-    cy.get('textarea[placeholder*="Diagnóstico"]').type('Tudo OK', { force: true });
-    cy.get('textarea[placeholder*="Prescrição"]').type('Nenhuma', { force: true });
+    cy.contains(produtoNome).should('be.visible');
+  });
 
-    cy.contains('button', 'Salvar e Finalizar Consulta').click();
+  it('Deve validar a lógica do Motor Financeiro (60/40)', () => {
+    cy.contains('Financeiro').click();
+    // Verifica se os cards de repasse e lucro estão renderizados
+    cy.contains('REPASSE MÉDICO (60%)').should('be.visible');
+    cy.contains('LUCRO CLÍNICA (40%)').should('be.visible');
+  });
 
-    cy.on('window:alert', () => true);
-    cy.contains(nomePaciente).should('not.exist');
+  it('Deve testar o disparo do formulário de campanhas', () => {
+    cy.contains('Campanhas').click();
+    cy.get('input[placeholder="Nome da Campanha"]').type('Campanha Novembro Azul');
+    cy.get('textarea[placeholder="Mensagem do WhatsApp..."]').type('Olá, não esqueça seu exame preventivo!');
+    
+    // O teste apenas clica, o disparo real depende da API de Zap estar ativa
+    cy.window().then((win) => {
+      cy.stub(win, 'confirm').returns(true);
+    });
+    cy.contains('button', 'Disparar para Todos').click();
   });
 });

@@ -4,6 +4,10 @@ import Recepcao from './pages/Recepcao';
 import PainelMedico from './pages/PainelMedico';
 import Triagem from './pages/Triagem';
 import Exames from './pages/Exames';
+import PainelAdmin from './pages/PainelAdmin';
+import AdminUsuarios from './pages/AdminUsuarios';
+import AdminFinanceiro from './pages/AdminFinanceiro';
+import AdminServicos from './pages/AdminServicos';
 import './App.css';
 
 function App() {
@@ -11,16 +15,14 @@ function App() {
     <BrowserRouter>
       <Routes>
         <Route path="/" element={<Login />} />
-        
         <Route path="/recepcao" element={<Recepcao />} />
-        
-        {/* 🔥 O ERRO ESTAVA AQUI! Agora a rota chama '/medico' do jeito que o Login espera */}
         <Route path="/medico" element={<PainelMedico />} />
-        
         <Route path="/Triagem" element={<Triagem />} />
         <Route path="/Exames" element={<Exames />} />
-
-        {/* Rota de segurança: se o cara digitar um link que não existe, volta pro Login */}
+        <Route path="/admin" element={<PainelAdmin />} />
+        <Route path="/admin/usuarios" element={<AdminUsuarios />} />
+        <Route path="/admin/financeiro" element={<AdminFinanceiro />} />
+        <Route path="/admin/servicos" element={<AdminServicos />} />
         <Route path="*" element={<Navigate to="/" />} />
       </Routes>
     </BrowserRouter>

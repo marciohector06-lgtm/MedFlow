@@ -1,133 +1,140 @@
 import { useState, useEffect } from 'react';
-import { useNavigate } from 'react-router-dom'; // Adicionado para navegar
 import { api } from '../services/api';
 import ModalCadastro from '../components/ModalCadastro';
-import { io } from 'socket.io-client';
-
-const socket = io('http://localhost:3333');
 
 export default function Recepcao() {
-  const navigate = useNavigate(); // Inicializa o navegador
   const [atendimentos, setAtendimentos] = useState([]);
-  const [abaAtiva, setAbaAtiva] = useState('recepcao');
   const [showModal, setShowModal] = useState(false);
-  const [busca, setBusca] = useState('');
+  const [horaAtual, setHoraAtual] = useState(new Date());
 
-  // 1. Puxa os dados de quem fez o login
-  const usuarioLogado = JSON.parse(localStorage.getItem('@MedFlow:usuario')) || { nome: 'Márcio Henrique' };
-
-  // 2. Função para sair do sistema
-  const fazerLogout = () => {
-    localStorage.removeItem('@MedFlow:usuario');
-    navigate('/');
-  };
-
-  const carregarDadosDoBanco = async () => {
+  const carregarDados = async () => {
     try {
-      const res = await api.get('/atendimentos');
-      const listaTotal = res.data.dados || res.data || [];
-      const filaAtiva = listaTotal.filter(item => item.status !== 'FINALIZADO');
-      setAtendimentos(filaAtiva);
-    } catch (e) {
-      console.error("Erro ao conectar com o servidor");
+      const response = await api.get('/atendimentos');
+      setAtendimentos(response.data);
+    } catch (error) {
+      console.error(error);
     }
   };
 
   useEffect(() => {
-    carregarDadosDoBanco();
-
-    socket.on('atualizaKanban', () => {
-      carregarDadosDoBanco();
-    });
-
-    return () => {
-      socket.off('atualizaKanban');
-    };
+    carregarDados();
+    const intervalo = setInterval(() => setHoraAtual(new Date()), 60000);
+    return () => clearInterval(intervalo);
   }, []);
 
-  const pacientesFiltrados = atendimentos.filter((atendimento) => {
-    const nome = atendimento.paciente?.nome?.toLowerCase() || '';
-    const cpf = atendimento.paciente?.cpf || '';
-    const termoBusca = busca.toLowerCase();
-    
-    return nome.includes(termoBusca) || cpf.includes(termoBusca);
-  });
+  const atualizarStatus = async (id, novoStatus) => {
+    setAtendimentos(prev =>
+      prev.map(a => a.id === id ? { ...a, status: novoStatus } : a)
+    );
+    try {
+      await api.put(`/atendimentos/${id}/status`, { status: novoStatus });
+    } catch (error) {
+      carregarDados();
+    }
+  };
+
+  const onDragStart = (e, id) => {
+    e.dataTransfer.setData('id', id);
+  };
+
+  const onDragOver = (e) => {
+    e.preventDefault();
+  };
+
+  const onDrop = (e, novoStatus) => {
+    const id = e.dataTransfer.getData('id');
+    atualizarStatus(id, novoStatus);
+  };
+
+  const realizarEncaixe = () => {
+    const aguardando = atendimentos.filter(a => a.status === 'AGUARDANDO');
+    if (aguardando.length === 0) return;
+
+    aguardando.sort((a, b) => {
+      if (a.prioridade === b.prioridade) {
+        return new Date(a.createdAt) - new Date(b.createdAt);
+      }
+      return a.prioridade ? -1 : 1;
+    });
+
+    atualizarStatus(aguardando[0].id, 'EM_ATENDIMENTO');
+  };
+
+  const verificarAtraso = (dataCriacao, prioridade) => {
+    const minutos = Math.floor((horaAtual - new Date(dataCriacao)) / 60000);
+    const limite = prioridade ? 10 : 30;
+    return minutos >= limite;
+  };
+
+  const renderColuna = (titulo, status, corPrincipal) => {
+    const filtrados = atendimentos.filter(a => a.status === status);
+
+    return (
+      <div
+        style={{ ...colunaStyle, borderTop: `5px solid ${corPrincipal}` }}
+        onDragOver={onDragOver}
+        onDrop={(e) => onDrop(e, status)}
+      >
+        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '15px' }}>
+          <h3 style={{ margin: 0, color: '#333' }}>{titulo} ({filtrados.length})</h3>
+          {status === 'EM_ATENDIMENTO' && (
+            <button onClick={realizarEncaixe} style={btnEncaixeStyle}>⚡ Encaixe</button>
+          )}
+        </div>
+
+        {filtrados.map(a => {
+          const isAtrasado = status === 'AGUARDANDO' && verificarAtraso(a.createdAt, a.prioridade);
+
+          return (
+            <div
+              key={a.id}
+              draggable
+              onDragStart={(e) => onDragStart(e, a.id)}
+              style={{ 
+                ...cardStyle, 
+                borderLeft: isAtrasado ? '5px solid #e74c3c' : `5px solid ${corPrincipal}`, 
+                backgroundColor: isAtrasado ? '#fff5f5' : '#fff' 
+              }}
+            >
+              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start' }}>
+                <strong style={{ color: '#2c3e50' }}>{a.paciente?.nome || 'Paciente Externo'}</strong>
+                {isAtrasado && <span style={alertaStyle}>⚠️ Atrasado</span>}
+              </div>
+              <p style={{ fontSize: '13px', color: '#7f8c8d', margin: '8px 0' }}>{a.convenio}</p>
+              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginTop: '10px' }}>
+                <span style={prioridadeStyle(a.prioridade)}>{a.prioridade ? 'ALTA' : 'NORMAL'}</span>
+                <span style={{ fontSize: '11px', color: '#95a5a6', fontWeight: 'bold' }}>
+                  Chegou: {new Date(a.createdAt).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
+                </span>
+              </div>
+            </div>
+          );
+        })}
+      </div>
+    );
+  };
 
   return (
-    <div className="admin-container">
-      <aside className="sidebar">
-        <div className="logo-section"><h2>MedFlow</h2></div>
-        <nav className="menu-nav">
-          <button onClick={() => setAbaAtiva('recepcao')} className={abaAtiva === 'recepcao' ? 'active' : ''}>📋 Atendimento</button>
-          <button onClick={() => setAbaAtiva('faturamento')} className={abaAtiva === 'faturamento' ? 'active' : ''}>💰 Faturamento</button>
-          <button onClick={() => setAbaAtiva('relatorios')} className={abaAtiva === 'relatorios' ? 'active' : ''}>📊 Relatórios</button>
-          
-          {/* Botão de Sair no final do menu lateral */}
-          <button onClick={fazerLogout} style={{ marginTop: 'auto', color: '#ff7675' }}>🚪 Sair do Sistema</button>
-        </nav>
-      </aside>
+    <div style={{ padding: '20px', fontFamily: 'sans-serif', backgroundColor: '#f4f7f6', minHeight: '100vh' }}>
+      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '20px' }}>
+        <h1 style={{ color: '#2c3e50', margin: 0 }}>🏥 Recepção MedFlow</h1>
+        <button onClick={() => setShowModal(true)} style={btnStyle}>+ Novo Paciente</button>
+      </div>
 
-      <main className="content">
-        <header className="content-header">
-          <h1>{abaAtiva === 'recepcao' ? 'RECEPÇÃO' : 'FATURAMENTO'}</h1>
-          <div className="user-info">Recepcionista: <strong>{usuarioLogado.nome}</strong></div>
-        </header>
+      <div style={{ display: 'flex', gap: '20px', overflowX: 'auto', paddingBottom: '20px' }}>
+        {renderColuna('Aguardando', 'AGUARDANDO', '#f39c12')}
+        {renderColuna('Em Atendimento', 'EM_ATENDIMENTO', '#3498db')}
+        {renderColuna('Finalizado', 'FINALIZADO', '#2ecc71')}
+      </div>
 
-        {abaAtiva === 'recepcao' && (
-          <section className="panel">
-            <div style={{ display: 'flex', gap: '15px', marginBottom: '15px' }}>
-              <button className="btn-new" onClick={() => setShowModal(true)}>+ Novo Agendamento</button>
-              <input 
-                type="text" 
-                placeholder="Buscar por Nome ou CPF..." 
-                value={busca}
-                onChange={(e) => setBusca(e.target.value)}
-                style={{ padding: '8px', width: '300px', borderRadius: '4px', border: '1px solid #ccc' }}
-              />
-            </div>
-            
-            <table className="medflow-table">
-              <thead>
-                <tr><th>Ficha</th><th>Paciente</th><th>Convênio</th><th>Status</th></tr>
-              </thead>
-              <tbody>
-                {pacientesFiltrados.length > 0 ? (
-                  pacientesFiltrados.map(item => (
-                    <tr key={item.id}>
-                      <td>#{item.id.substring(0, 5).toUpperCase()}</td>
-                      <td>{item.paciente?.nome}</td>
-                      <td>{item.convenio || 'PARTICULAR'}</td>
-                      <td><span className="status-tag">{item.status}</span></td>
-                    </tr>
-                  ))
-                ) : (
-                  <tr>
-                    <td colSpan="4" style={{ textAlign: 'center', padding: '20px', color: '#666' }}>
-                      Nenhum paciente na fila.
-                    </td>
-                  </tr>
-                )}
-              </tbody>
-            </table>
-          </section>
-        )}
-
-        {abaAtiva === 'faturamento' && (
-          <section className="panel">
-            <div className="faturamento-grid">
-              <div className="card-faturamento blue"><h4>Particular</h4><p>R$ 1.250,00</p></div>
-              <div className="card-faturamento green"><h4>Convênios</h4><p>R$ 4.890,00</p></div>
-            </div>
-          </section>
-        )}
-
-        {showModal && (
-          <ModalCadastro 
-            fecharModal={() => setShowModal(false)} 
-            atualizarFila={carregarDadosDoBanco} 
-          />
-        )}
-      </main>
+      {showModal && <ModalCadastro fecharModal={() => setShowModal(false)} atualizarFila={carregarDados} />}
     </div>
   );
 }
+
+const colunaStyle = { flex: 1, minWidth: '320px', backgroundColor: '#fff', borderRadius: '8px', padding: '20px', boxShadow: '0 4px 6px rgba(0,0,0,0.05)', minHeight: '75vh' };
+const cardStyle = { padding: '15px', borderRadius: '8px', marginBottom: '15px', cursor: 'grab', boxShadow: '0 2px 4px rgba(0,0,0,0.08)', transition: 'all 0.2s ease-in-out' };
+const btnStyle = { padding: '12px 24px', backgroundColor: '#2980b9', color: '#fff', border: 'none', borderRadius: '6px', cursor: 'pointer', fontWeight: 'bold', fontSize: '14px', boxShadow: '0 2px 4px rgba(41, 128, 185, 0.3)' };
+const btnEncaixeStyle = { padding: '6px 12px', backgroundColor: '#8e44ad', color: '#fff', border: 'none', borderRadius: '4px', cursor: 'pointer', fontSize: '12px', fontWeight: 'bold', boxShadow: '0 2px 4px rgba(142, 68, 173, 0.3)' };
+const alertaStyle = { fontSize: '11px', color: '#e74c3c', fontWeight: 'bold' };
+const prioridadeStyle = (alta) => ({ display: 'inline-block', padding: '4px 10px', borderRadius: '12px', fontSize: '10px', fontWeight: '900', backgroundColor: alta ? '#ffeaa7' : '#e0f7fa', color: alta ? '#d35400' : '#0097a7', textTransform: 'uppercase' });

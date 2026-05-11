@@ -8,16 +8,22 @@ export default function Login() {
   const navigate = useNavigate();
 
   const handleLogin = (e) => {
-    e.preventDefault(); 
+    e.preventDefault();
 
-    // Verifica o perfil escolhido e manda para a tela certa
     if (perfil === 'medico') {
-      // AJUSTE: cargo salvo como 'medico' (minúsculo e sem acento) para não dar erro na trava de segurança da tela
-      localStorage.setItem('@MedFlow:usuario', JSON.stringify({ nome: 'Dr. Silva', cargo: 'medico' }));
+      localStorage.setItem('@MedFlow:usuario', JSON.stringify({ nome: 'Dr. Márcio Henrique', cargo: 'medico' }));
       navigate('/medico');
+    } else if (perfil === 'admin') {
+      localStorage.setItem('@MedFlow:usuario', JSON.stringify({ nome: 'Gestão', cargo: 'admin' }));
+      navigate('/admin');
+    } else if (perfil === 'triagem') {
+      localStorage.setItem('@MedFlow:usuario', JSON.stringify({ nome: 'Triagem', cargo: 'triagem' }));
+      navigate('/Triagem');
+    } else if (perfil === 'exames') {
+      localStorage.setItem('@MedFlow:usuario', JSON.stringify({ nome: 'SADT', cargo: 'exames' }));
+      navigate('/Exames');
     } else {
-      // AJUSTE: cargo salvo como 'recepcao' para manter o mesmo padrão seguro
-      localStorage.setItem('@MedFlow:usuario', JSON.stringify({ nome: 'Márcio', cargo: 'recepcao' }));
+      localStorage.setItem('@MedFlow:usuario', JSON.stringify({ nome: 'Recepção', cargo: 'recepcao' }));
       navigate('/recepcao');
     }
   };
@@ -59,7 +65,10 @@ export default function Login() {
               style={{ width: '100%', padding: '10px', marginTop: '5px', borderRadius: '4px', border: '1px solid #ccc' }}
             >
               <option value="recepcao">Recepção</option>
+              <option value="triagem">Triagem</option>
               <option value="medico">Médico</option>
+              <option value="exames">Exames (SADT)</option>
+              <option value="admin">Administrador</option>
             </select>
           </div>
 

@@ -12,9 +12,9 @@ export default function PainelMedico() {
     try {
       const res = await api.get('/atendimentos');
       const listaTotal = res.data.dados || res.data || [];
-      setFila(listaTotal);
+      setFila(listaTotal.filter(item => item.status === 'AGUARDANDO'));
     } catch (e) {
-      console.log("Erro ao carregar a fila do médico");
+      console.error(e);
     }
   };
 
@@ -22,29 +22,36 @@ export default function PainelMedico() {
     carregarFila();
   }, []);
 
-  const chamarPaciente = (paciente) => {
-    setPacienteAtual(paciente);
-    setSintomas('');
-    setDiagnostico('');
-    setPrescricao('');
+  const chamarPaciente = async (paciente) => {
+    try {
+      await api.put(`/atendimentos/${paciente.id}/status`, { status: 'EM_ATENDIMENTO' });
+      setPacienteAtual(paciente);
+      setSintomas('');
+      setDiagnostico('');
+      setPrescricao('');
+      carregarFila();
+    } catch (error) {
+      alert("Erro ao chamar o paciente. Verifique o servidor.");
+    }
   };
 
-  const finalizarAtendimento = () => {
-    alert("✅ Consulta finalizada com sucesso!");
-    setPacienteAtual(null);
-    carregarFila();
+  const finalizarAtendimento = async () => {
+    if (!pacienteAtual) return;
+    try {
+      await api.put(`/atendimentos/${pacienteAtual.id}/status`, { status: 'FINALIZADO' });
+      setPacienteAtual(null);
+      carregarFila();
+    } catch (error) {
+      alert("Erro ao finalizar atendimento.");
+    }
   };
 
   const solicitarExame = () => {
     alert("🧪 Pedido de Exame (SADT) gerado! Paciente encaminhado para coleta interna.");
-    setPacienteAtual(null);
-    carregarFila();
   };
 
   const marcarRetorno = () => {
     alert("📅 Retorno de 15 dias sem custo liberado para agendamento na recepção.");
-    setPacienteAtual(null);
-    carregarFila();
   };
 
   return (
@@ -81,7 +88,7 @@ export default function PainelMedico() {
                 ) : (
                   fila.map(item => (
                     <tr key={item.id}>
-                      <td>#{item.id}</td>
+                      <td>#{item.id.substring(0,5).toUpperCase()}</td>
                       <td>{item.paciente?.nome || item.nome || 'Paciente Externo'}</td>
                       <td>{item.convenio}</td>
                       <td>
@@ -105,7 +112,6 @@ export default function PainelMedico() {
             </div>
 
             <div className="form-grid" style={{ gridTemplateColumns: '1fr' }}>
-              
               <div className="input-group">
                 <label style={{ fontWeight: 'bold', marginBottom: '8px', display: 'block' }}>Sintomas (Anamnese)</label>
                 <textarea 
@@ -138,7 +144,6 @@ export default function PainelMedico() {
                   style={{ width: '100%', padding: '12px', borderRadius: '8px', border: '1px solid #ccc', resize: 'vertical' }}
                 />
               </div>
-
             </div>
 
             <div style={{ display: 'flex', gap: '15px', marginTop: '30px', flexWrap: 'wrap' }}>
