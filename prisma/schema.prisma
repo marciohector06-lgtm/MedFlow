@@ -1,77 +1,87 @@
+// Configuração do Cliente Prisma
 generator client {
   provider = "prisma-client-js"
 }
 
+// Configuração da Base de Dados baseada no .env 
 datasource db {
   provider = "postgresql"
   url      = env("DATABASE_URL")
 }
 
-// --- AS TABELAS DO SEU DIAGRAMA ---
+// --- ENUMS PARA CONTROLO DE ACESSO E FLUXO ---
 
-model Usuario {
-  id           Int           @id @default(autoincrement())
-  nome         String
-  email        String        @unique
-  senha        String
-  cargo        String
-  ativo        Boolean       @default(true)
-  
-  // O Prisma entende que um médico pode ter vários atendimentos
-  atendimentos Atendimento[] 
+enum Role {
+  SUPERADMIN
+  RECEPCAO
+  TRIAGEM
+  MEDICO
 }
 
-model Convenio {
-  id        Int        @id @default(autoincrement())
-  nome      String
-  ativo     Boolean    @default(true)
-  pacientes Paciente[] 
+enum StatusAtendimento {
+  AGUARDANDO_TRIAGEM
+  EM_TRIAGEM
+  AGUARDANDO_CONSULTA
+  EM_CONSULTA
+  FINALIZADO
+  AUSENTE_AGUARDANDO_RETORNO
+}
+
+// --- MODELOS DE UTILIZADORES E ACESSO ---
+
+model Usuario {
+  id    Int    @id @default(autoincrement())
+  nome  String
+  email String @unique
+  senha String
+  role  Role   @default(RECEPCAO)
+}
+
+// --- MODELOS DO DOMÍNIO MÉDICO ---
+
+model Paciente {
+  id                Int           @id @default(autoincrement())
+  nome              String
+  cpf               String        @unique
+  telefone          String
+  data_nascimento   DateTime      
+  responsavel_legal String?       
+  nome_mae          String?       
+  cep               String?
+  endereco          String?
+  atendimentos      Atendimento[]
 }
 
 model Procedimento {
-  id             Int           @id @default(autoincrement())
-  nome           String
-  tempo_estimado Int
-  ativo          Boolean       @default(true)
-  atendimentos   Atendimento[] 
-}
-
-model Paciente {
-  id              Int           @id @default(autoincrement())
-  nome            String
-  cpf             String        @unique
-  data_nascimento DateTime?
-  telefone        String
-  cep             String?
-  endereco        String?
-  
-  // A seta ligando no Convênio
-  convenio_id     Int?
-  convenio        Convenio?     @relation(fields: [convenio_id], references: [id])
-  
-  atendimentos    Atendimento[]
+  id           Int           @id @default(autoincrement())
+  nome         String
+  atendimentos Atendimento[]
 }
 
 model Atendimento {
-  id            Int       @id @default(autoincrement())
-  tipo          String
-  prioridade    Boolean   @default(false)
-  status        String    @default("AGUARDANDO")
-  criado_em     DateTime  @default(now())
-  chamado_em    DateTime?
-  finalizado_em DateTime?
+  id              Int               @id @default(autoincrement())
+  tipo            String?
+  prioridade      Boolean           @default(false)
+  status          StatusAtendimento @default(AGUARDANDO_TRIAGEM)
   
-  // Aqui entram os campos novos que a gente planejou:
-  diagnostico   String?   @db.Text
-  prescricao    String?   @db.Text
-
-  // As setinhas que você puxou lá no Draw.io
+  // Relações
   paciente_id     Int
-  paciente        Paciente      @relation(fields: [paciente_id], references: [id])
+  paciente        Paciente          @relation(fields: [paciente_id], references: [id])
   
   procedimento_id Int
-  procedimento    Procedimento  @relation(fields: [procedimento_id], references: [id])
+  procedimento    Procedimento      @relation(fields: [procedimento_id], references: [id])
   
-  medico_id       Int?          // Fica vazio até o médico puxar a ficha
-  medico          Usuario?      @relation(fields: [medico_id], references: [id])
+  triagem         Triagem?
+  createdAt       DateTime          @default(now())
+}
+
+model Triagem {
+  id             Int         @id @default(autoincrement())
+  atendimento_id Int         @unique
+  atendimento    Atendimento @relation(fields: [atendimento_id], references: [id])
+  
+  pressao        String?
+  peso           Float?
+  sintomas       String
+  classificacao  String      // Ex: VERMELHO, AMARELO, VERDE, AZUL
 }

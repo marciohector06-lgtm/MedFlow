@@ -63,6 +63,19 @@ class AtendimentoController {
             res.status(500).json({ erro: 'Erro ao atualizar status de ausência.' });
         }
     }
+
+    async mudarStatus(req, res) {
+        try {
+            const { id } = req.params;
+            const { status } = req.body; // Vem do frontend qual coluna o card caiu
+
+            // Chama o service que criamos no passo anterior
+            const atualizado = await atendimentoService.atualizarStatusKanban(id, status);
+            res.json(atualizado);
+        } catch (erro) {
+            res.status(400).json({ erro: erro.message });
+        }
+    }
 }
 
 module.exports = new AtendimentoController();
