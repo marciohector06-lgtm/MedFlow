@@ -7,50 +7,70 @@ export class AtendimentoController {
   async listar(req: Request, res: Response) {
     try {
       const atendimentos = await prisma.atendimento.findMany({
-        include: { paciente: true },
-        orderBy: { hora_chegada: 'asc' }
+        include: {
+          paciente: true,
+          servico: true
+        },
+        orderBy: {
+          createdAt: 'asc'
+        }
       });
       return res.json(atendimentos);
     } catch (error) {
-      return res.status(500).json({ erro: 'Erro ao buscar atendimentos' });
+      return res.status(500).json({ erro: 'Erro ao listar atendimentos' });
     }
   }
 
   async criar(req: Request, res: Response) {
     try {
-      const { nome, cpf, data_nascimento, sexo, whatsapp, cep, endereco, convenio } = req.body;
+      const { 
+        nome, cpf, data_nascimento, sexo, whatsapp, cep, endereco, numero, 
+        bairro, cidade, uf, nome_mae, nome_responsavel, cpf_responsavel, 
+        parentesco, convenio, numero_guia, servicoId 
+      } = req.body;
 
-      const paciente = await prisma.paciente.create({
-        data: {
-          nome,
-          cpf,
-          data_nascimento: new Date(data_nascimento),
-          sexo,
-          whatsapp,
-          cep,
-          endereco,
-          numero: "S/N",
-          bairro: "N/A",
-          cidade: "Brasília",
-          uf: "DF"
-        }
-      });
+      let paciente = await prisma.paciente.findUnique({ where: { cpf } });
+
+      if (!paciente) {
+        paciente = await prisma.paciente.create({
+          data: { 
+            nome, cpf, data_nascimento: new Date(data_nascimento), sexo, 
+            whatsapp, cep, endereco, numero, bairro, cidade, uf, 
+            nome_mae, nome_responsavel, cpf_responsavel, parentesco 
+          }
+        });
+      }
 
       const atendimento = await prisma.atendimento.create({
         data: {
           pacienteId: paciente.id,
-          status: "AGUARDANDO",
-          prioridade: "NORMAL",
-          convenio: convenio || "PARTICULAR"
+          convenio,
+          numero_guia,
+          servicoId: servicoId || null
+        },
+        include: {
+          paciente: true
         }
       });
 
-      req.app.get('io').emit('atualizaKanban');
-
       return res.json(atendimento);
     } catch (error) {
-      console.error(error);
-      return res.status(500).json({ erro: 'Erro ao cadastrar' });
+      return res.status(500).json({ erro: 'Erro ao criar atendimento' });
+    }
+  }
+
+  async atualizarStatus(req: Request, res: Response) {
+    try {
+      const { id } = req.params;
+      const { status, sintomas, diagnostico, prescricao } = req.body;
+
+      const atendimento = await prisma.atendimento.update({
+        where: { id },
+        data: { status, sintomas, diagnostico, prescricao }
+      });
+      return res.json(atendimento);
+    } catch (error) {
+      return res.status(500).json({ erro: 'Erro ao atualizar status' });
     }
   }
 }

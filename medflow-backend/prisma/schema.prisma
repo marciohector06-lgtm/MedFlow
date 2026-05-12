@@ -12,54 +12,85 @@ model Usuario {
   nome      String
   email     String   @unique
   senha     String
-  cargo     String   // ADMIN, RECEPCIONISTA, MEDICO
+  cargo     String
   createdAt DateTime @default(now())
 }
 
 model Paciente {
-  id                String   @id @default(uuid())
-  nome              String
-  cpf               String   @unique
-  data_nascimento   DateTime
-  sexo              String
-  whatsapp          String
-  
-  // Endereço (ViaCEP)
-  cep               String
-  endereco          String
-  numero            String
-  bairro            String
-  cidade            String
-  uf                String
-
-  // Regras do TCC (Menores/Idosos)
-  nome_responsavel  String?
-  cpf_responsavel   String?
-  parentesco        String?
-  nome_mae          String?  
-
-  atendimentos      Atendimento[]
-  createdAt         DateTime @default(now())
+  id               String        @id @default(uuid())
+  nome             String
+  cpf              String        @unique
+  data_nascimento  DateTime
+  sexo             String
+  whatsapp         String
+  cep              String
+  endereco         String
+  numero           String
+  bairro           String
+  cidade           String
+  uf               String
+  nome_responsavel String?
+  cpf_responsavel  String?
+  parentesco       String?
+  nome_mae         String?
+  atendimentos     Atendimento[]
+  createdAt        DateTime      @default(now())
 }
 
 model Atendimento {
-  id                String   @id @default(uuid())
-  pacienteId        String
-  paciente          Paciente @relation(fields: [pacienteId], references: [id])
+  id            String   @id @default(uuid())
+  pacienteId    String
+  paciente      Paciente @relation(fields: [pacienteId], references: [id])
+  servicoId     String?
+  servico       Servico? @relation(fields: [servicoId], references: [id])
+  status        String   @default("AGUARDANDO")
+  prioridade    Boolean  @default(false)
+  convenio      String   @default("PARTICULAR")
+  numero_guia   String?
+  sintomas      String?
+  diagnostico   String?
+  prescricao    String?
+  exames_sadt   Sadt[]
+  createdAt     DateTime @default(now())
+  updatedAt     DateTime @updatedAt
+}
 
-  // Motor do Kanban
-  status            String   @default("AGUARDANDO") 
-  prioridade        String   @default("NORMAL")
+model Sadt {
+  id             String      @id @default(uuid())
+  atendimentoId  String
+  atendimento    Atendimento @relation(fields: [atendimentoId], references: [id])
+  nome_exame     String
+  observacoes    String?
+  data_solicitado DateTime   @default(now())
+  status         String      @default("PENDENTE")
+}
 
-  // Cronômetro de Atrasos
-  hora_chegada      DateTime @default(now())
-  hora_inicio_atend DateTime?
-  hora_finalizacao  DateTime?
+model Servico {
+  id           String        @id @default(uuid())
+  nome         String
+  descricao    String?
+  valor        Float
+  categoria    String
+  atendimentos Atendimento[]
+  createdAt    DateTime      @default(now())
+}
 
-  // Prontuário Médico
-  evolucao_clinica  String?
-  exames_solicitados String?
+model Produto {
+  id          String   @id @default(uuid())
+  nome        String
+  quantidade  Int
+  unidade     String   // ex: CX, UN, ML
+  precoCusto  Float
+  validade    DateTime?
+  createdAt   DateTime @default(now())
+}
 
-  createdAt         DateTime @default(now())
-  updatedAt         DateTime @updatedAt
+model Campanha {
+  id        String   @id @default(uuid())
+  nome      String
+  tema      String
+  mensagem  String
+  desconto  String?
+  status    String   @default("RASCUNHO") // RASCUNHO, ENVIADA
+  createdAt DateTime @default(now())
 }

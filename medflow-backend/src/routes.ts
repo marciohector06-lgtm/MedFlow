@@ -1,51 +1,34 @@
 import { Router } from 'express';
-import { AtendimentoController } from './controllers/AtendimentoController';
-import { PrismaClient } from '@prisma/client';
+import { AtendimentoController } from './controllers/atendimentoController';
+import { UsuarioController } from './controllers/usuarioController';
+import { ServicoController } from './controllers/servicoController';
+import { ProdutoController } from './controllers/produtoController';
+import { CampanhaController } from './controllers/campanhaController';
 
 const router = Router();
+
 const atendimentoController = new AtendimentoController();
-const prisma = new PrismaClient();
+const usuarioController = new UsuarioController();
+const servicoController = new ServicoController();
+const produtoController = new ProdutoController();
+const campanhaController = new CampanhaController();
 
 router.get('/atendimentos', atendimentoController.listar);
 router.post('/atendimentos', atendimentoController.criar);
+router.put('/atendimentos/:id/status', atendimentoController.atualizarStatus);
 
-router.get('/gerar-teste', async (req, res) => {
-  try {
-    const paciente = await prisma.paciente.create({
-      data: {
-        nome: "Paciente de Teste",
-        cpf: "111.222.333-44",
-        data_nascimento: new Date("1990-01-01T00:00:00Z"),
-        sexo: "M",
-        whatsapp: "61988887777",
-        cep: "71020-000",
-        endereco: "QE 30 Conjunto A",
-        numero: "10",
-        bairro: "Guará II",
-        cidade: "Brasília",
-        uf: "DF"
-      }
-    });
+router.get('/usuarios', usuarioController.listar);
+router.post('/usuarios', usuarioController.criar);
+router.delete('/usuarios/:id', usuarioController.remover);
 
-    const atendimento = await prisma.atendimento.create({
-      data: {
-        pacienteId: paciente.id,
-        status: "AGUARDANDO",
-        prioridade: "NORMAL"
-      }
-    });
+router.get('/servicos', servicoController.listar);
+router.post('/servicos', servicoController.criar);
 
-    req.app.get('io').emit('atualizaKanban');
+router.get('/produtos', produtoController.listar);
+router.post('/produtos', produtoController.criar);
+router.put('/produtos/:id/baixa', produtoController.baixaAutomatica);
 
-    return res.json({ 
-      mensagem: "Golaço! Paciente e Atendimento criados com sucesso no banco!", 
-      paciente, 
-      atendimento 
-    });
-  } catch (error) {
-    console.error(error);
-    return res.status(500).json({ erro: "Deu ruim ao gerar o teste. Será que esse CPF já existe no banco?" });
-  }
-});
+router.get('/campanhas', campanhaController.listar);
+router.post('/campanhas/disparar', campanhaController.disparar);
 
 export { router };
