@@ -54,7 +54,8 @@ export default function ModalCadastro({ fecharModal, atualizarFila }) {
           setUf(response.data.uf);
         }
       } catch (error) {
-        alert('Erro ao buscar CEP');
+        console.error(error);
+        alert('Erro ao buscar CEP na base dos Correios.');
       }
     }
   };
@@ -79,16 +80,12 @@ export default function ModalCadastro({ fecharModal, atualizarFila }) {
 
     const idade = calcularIdade(dataNascimento);
 
-    if (idade < 18) {
-      if (!nomeMae.trim() || !responsavel.trim()) {
-        return alert('⚠️ ERRO: Para pacientes menores de 18 anos, os campos "Nome da Mãe" e "Responsável" são obrigatórios.');
-      }
+    if (idade < 18 && (!nomeMae.trim() || !responsavel.trim())) {
+      return alert('Para pacientes menores de 18 anos, os campos Nome da Mãe e Responsável são obrigatórios.');
     }
 
-    if (idade >= 60) {
-      if (!responsavel.trim()) {
-        return alert('⚠️ ERRO: Para pacientes com 60 anos ou mais, o campo "Responsável/Acompanhante" é obrigatório.');
-      }
+    if (idade >= 60 && !responsavel.trim()) {
+      return alert('Para pacientes com 60 anos ou mais, o campo Responsável/Acompanhante é obrigatório.');
     }
 
     try {
@@ -109,12 +106,17 @@ export default function ModalCadastro({ fecharModal, atualizarFila }) {
         cpf_responsavel: cpfResponsavel.replace(/\D/g, ''),
         parentesco,
         convenio,
-        numero_guia: numCarteirinha
+        numero_guia: numCarteirinha,
+        status: 'AGUARDANDO_TRIAGEM',
+        categoria: 'GERAL',
+        paciente: { nome: nome }
       });
       atualizarFila();
       fecharModal();
     } catch (error) {
-      alert('Erro ao salvar o paciente. Verifique os dados no servidor.');
+      console.error(error);
+      const mensagemErro = error.response?.data?.error || 'Verifique o terminal do backend para mais detalhes.';
+      alert(`Falha ao salvar o paciente: ${mensagemErro}`);
     }
   };
 
@@ -122,7 +124,7 @@ export default function ModalCadastro({ fecharModal, atualizarFila }) {
     <div style={overlayStyle}>
       <div style={modalStyle}>
         <h2 style={{ marginBottom: '20px', borderBottom: '1px solid #eee', paddingBottom: '10px' }}>
-          📄 Cadastro do Paciente
+           Cadastro do Paciente
         </h2>
         
         <form onSubmit={handleSalvar} style={{ display: 'flex', flexDirection: 'column', gap: '15px' }}>

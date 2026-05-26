@@ -38,31 +38,34 @@ model Paciente {
 }
 
 model Atendimento {
-  id            String   @id @default(uuid())
-  pacienteId    String
-  paciente      Paciente @relation(fields: [pacienteId], references: [id])
-  servicoId     String?
-  servico       Servico? @relation(fields: [servicoId], references: [id])
-  status        String   @default("AGUARDANDO")
-  prioridade    Boolean  @default(false)
-  convenio      String   @default("PARTICULAR")
-  numero_guia   String?
-  sintomas      String?
-  diagnostico   String?
-  prescricao    String?
-  exames_sadt   Sadt[]
-  createdAt     DateTime @default(now())
-  updatedAt     DateTime @updatedAt
+  id          String   @id @default(uuid())
+  pacienteId  String
+  paciente    Paciente @relation(fields: [pacienteId], references: [id])
+  servicoId   String?
+  servico     Servico? @relation(fields: [servicoId], references: [id])
+  status      String   @default("AGUARDANDO")
+  prioridade  Boolean  @default(false)
+  convenio    String   @default("PARTICULAR")
+  numero_guia String?
+  sintomas    String?
+  diagnostico String?
+  prescricao  String?
+  exames      Exame[]
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
 }
 
-model Sadt {
-  id             String      @id @default(uuid())
-  atendimentoId  String
-  atendimento    Atendimento @relation(fields: [atendimentoId], references: [id])
-  nome_exame     String
-  observacoes    String?
-  data_solicitado DateTime   @default(now())
-  status         String      @default("PENDENTE")
+model Exame {
+  id            String      @id @default(uuid())
+  atendimentoId String
+  atendimento   Atendimento @relation(fields: [atendimentoId], references: [id], onDelete: Cascade)
+  categoria     String
+  exame         String
+  prioridade    String
+  justificativa String
+  observacoes   String?
+  status        String      @default("PENDENTE")
+  createdAt     DateTime    @default(now())
 }
 
 model Servico {
@@ -76,13 +79,13 @@ model Servico {
 }
 
 model Produto {
-  id          String   @id @default(uuid())
-  nome        String
-  quantidade  Int
-  unidade     String   // ex: CX, UN, ML
-  precoCusto  Float
-  validade    DateTime?
-  createdAt   DateTime @default(now())
+  id         String    @id @default(uuid())
+  nome       String
+  quantidade Int
+  unidade    String
+  precoCusto Float
+  validade   DateTime?
+  createdAt  DateTime  @default(now())
 }
 
 model Campanha {
@@ -91,6 +94,18 @@ model Campanha {
   tema      String
   mensagem  String
   desconto  String?
-  status    String   @default("RASCUNHO") // RASCUNHO, ENVIADA
+  status    String   @default("RASCUNHO")
   createdAt DateTime @default(now())
+}
+model Usuario {
+  id            String  @id @default(uuid())
+  nome          String
+  email         String  @unique
+  senha         String
+  cargo         String
+  cpf           String?
+  registro      String?
+  telefone      String?
+  especialidade String?
+  createdAt     DateTime @default(now())
 }

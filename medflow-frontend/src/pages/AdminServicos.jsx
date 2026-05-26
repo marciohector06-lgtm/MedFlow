@@ -29,7 +29,7 @@ export default function AdminServicos() {
     <div className="admin-container">
       <main className="content" style={{ padding: '40px' }}>
         <section className="panel">
-          <h2>💰 Tabela de Preços e Serviços</h2>
+          <h2> Tabela de Preços e Serviços</h2>
           <form onSubmit={handleSalvar} style={{ display: 'grid', gridTemplateColumns: '2fr 1fr 1fr auto', gap: '10px', marginTop: '20px' }}>
             <input type="text" placeholder="Nome do Serviço (Ex: Raio-X)" value={nome} onChange={e => setNome(e.target.value)} required style={inputStyle} />
             <input type="number" step="0.01" placeholder="Valor R$" value={valor} onChange={e => setValor(e.target.value)} required style={inputStyle} />

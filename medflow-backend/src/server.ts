@@ -1,7 +1,7 @@
 import express from 'express';
+import cors from 'cors';
 import http from 'http';
 import { Server } from 'socket.io';
-import cors from 'cors';
 import { router } from './routes';
 
 const app = express();
@@ -9,22 +9,23 @@ const server = http.createServer(app);
 
 const io = new Server(server, {
   cors: {
-    origin: '*', 
+    origin: '*',
+    methods: ['GET', 'POST', 'PUT', 'DELETE']
   }
 });
+
+app.set('io', io);
 
 app.use(cors());
 app.use(express.json());
 
-app.set('io', io);
-
-io.on('connection', (socket) => {
-  console.log(`🔌 Novo radar conectado! ID: ${socket.id}`);
-});
-
 app.use(router);
 
-const PORT = process.env.PORT || 3333;
-server.listen(PORT, '0.0.0.0', () => {
-  console.log(`🚀 MedFlow online na porta ${PORT}`);
+io.on('connection', (socket) => {
+  socket.on('disconnect', () => {
+  });
+});
+
+server.listen(3333, () => {
+  console.log('Servidor MedFlow rodando na porta 3333');
 });

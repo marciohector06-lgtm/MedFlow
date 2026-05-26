@@ -1,11 +1,19 @@
 import axios from 'axios';
 
-// Conexão com o seu Backend Node.js
 export const api = axios.create({
   baseURL: 'http://localhost:3333',
 });
 
-// Conexão com a API do Correios
+api.interceptors.request.use(async config => {
+  const token = localStorage.getItem('@MedFlow:token');
+  
+  if (token) {
+    config.headers.Authorization = `Bearer ${token}`;
+  }
+  
+  return config;
+});
+
 export const viaCep = axios.create({
   baseURL: 'https://viacep.com.br/ws/',
 });

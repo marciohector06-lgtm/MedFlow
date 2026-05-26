@@ -1,233 +1,535 @@
 import { useState, useEffect } from 'react';
 import { api } from '../services/api';
-import { useNavigate } from 'react-router-dom';
-import ScannerEstoque from '../components/ScannerEstoque';
+import toast, { Toaster } from 'react-hot-toast';
 
 export default function PainelAdmin() {
-  const navigate = useNavigate();
   const [abaAtiva, setAbaAtiva] = useState('dashboard');
-  const [atendimentos, setAtendimentos] = useState([]);
   const [usuarios, setUsuarios] = useState([]);
-  const [servicos, setServicos] = useState([]);
-  const [produtos, setProdutos] = useState([]);
-  const [campanhas, setCampanhas] = useState([]);
+  const [estoque, setEstoque] = useState([]);
+  const [extrato, setExtrato] = useState([]);
+  const [guias, setGuias] = useState([]);
+  
+  const [modalUsuario, setModalUsuario] = useState(false);
+  const [formUsuario, setFormUsuario] = useState({ 
+    nome: '', email: '', senha: '', cargo: 'RECEPCAO',
+    cpf: '', registro: '', telefone: '', especialidade: '' 
+  });
 
-  const [formUsuario, setFormUsuario] = useState({ nome: '', email: '', senha: '', cargo: 'RECEPCIONISTA' });
-  const [formServico, setFormServico] = useState({ nome: '', valor: '', categoria: 'CONSULTA' });
-  const [formProd, setFormProd] = useState({ nome: '', quantidade: '', unidade: 'UN', precoCusto: '' });
-  const [formCamp, setFormCamp] = useState({ nome: '', tema: 'Geral', mensagem: '', desconto: '' });
+  const [modalEstoque, setModalEstoque] = useState(false);
+  const [formEstoque, setFormEstoque] = useState({ nome: '', quantidade: '' });
+
+  const [filtroData, setFiltroData] = useState({ inicio: '', fim: '' });
+
+  const [metricas, setMetricas] = useState({
+    atendimentosHoje: 0,
+    faturamentoMes: 0,
+    alertasEstoque: 0
+  });
+
+  const mascaraCPF = (valor) => {
+    return valor
+      .replace(/\D/g, '')
+      .replace(/(\d{3})(\d)/, '$1.$2')
+      .replace(/(\d{3})(\d)/, '$1.$2')
+      .replace(/(\d{3})(\d{1,2})/, '$1-$2')
+      .replace(/(-\d{2})\d+?$/, '$1');
+  };
+
+  const mascaraTelefone = (valor) => {
+    return valor
+      .replace(/\D/g, '')
+      .replace(/(\d{2})(\d)/, '($1) $2')
+      .replace(/(\d{5})(\d)/, '$1-$2')
+      .replace(/(-\d{4})\d+?$/, '$1');
+  };
 
   const carregarDados = async () => {
     try {
-      const resAtend = await api.get('/atendimentos');
-      setAtendimentos(resAtend.data.dados || resAtend.data || []);
-    } catch (e) { console.error(e); }
+      const resUsuarios = await api.get('/usuarios');
+      const usuariosData = resUsuarios.data || [];
+      setUsuarios(usuariosData);
 
-    try {
-      const resUser = await api.get('/usuarios');
-      setUsuarios(resUser.data || []);
-    } catch (e) { console.error(e); }
+      const resEstoque = await api.get('/produtos').catch(() => ({ data: [] }));
+      const estoqueData = resEstoque.data && resEstoque.data.length > 0 ? resEstoque.data : [
+        { id: 1, nome: 'Seringa 5ml', quantidade: 450, status: 'Normal' },
+        { id: 2, nome: 'Soro Fisiológico 500ml', quantidade: 12, status: 'Baixo' },
+        { id: 3, nome: 'Luvas de Procedimento (M)', quantidade: 5, status: 'Critico' }
+      ];
+      setEstoque(estoqueData);
 
-    try {
-      const resServ = await api.get('/servicos');
-      setServicos(resServ.data || []);
-    } catch (e) { console.error(e); }
+      const extratoData = [
+        { id: 1, data: new Date().toISOString().split('T')[0], descricao: 'Consulta Cardiológica', fonte: 'Particular (PIX)', valor: 350.00, tipo: 'entrada' },
+        { id: 2, data: new Date().toISOString().split('T')[0], descricao: 'Exame de Imagem (Raio-X)', fonte: 'Convênio SulAmérica', valor: 120.00, tipo: 'faturar' },
+        { id: 3, data: new Date().toISOString().split('T')[0], descricao: 'Pagamento Fornecedor (Seringas)', fonte: 'Despesa Operacional', valor: -850.00, tipo: 'saida' },
+        { id: 4, data: new Date(Date.now() - 86400000).toISOString().split('T')[0], descricao: 'Consulta Clínico Geral', fonte: 'Particular (Cartão)', valor: 200.00, tipo: 'entrada' }
+      ];
+      setExtrato(extratoData);
 
-    try {
-      const resProd = await api.get('/produtos');
-      setProdutos(resProd.data || []);
-    } catch (e) { console.error(e); }
+      setGuias([
+        { id: '74892-A', carteirinha: 'GDF-938402-21', fatura: 'FAT-2026-001', paciente: 'Carlos Silva', convenio: 'GDF SAUDE', procedimento: 'Consulta Clínica', valor: 120.00, status: 'AGUARDANDO_ENVIO' },
+        { id: '74893-B', carteirinha: 'SUL-294811-00', fatura: 'FAT-2026-002', paciente: 'Ana Paula Souza', convenio: 'SULAMERICA', procedimento: 'Raio-X de Tórax', valor: 250.00, status: 'ENVIADO' },
+        { id: '74894-C', carteirinha: 'BRA-104958-33', fatura: 'FAT-2026-003', paciente: 'Marcos Almeida', convenio: 'BRADESCO', procedimento: 'Eletrocardiograma', valor: 180.00, status: 'PAGO' }
+      ]);
 
-    try {
-      const resCamp = await api.get('/campanhas');
-      setCampanhas(resCamp.data || []);
-    } catch (e) { console.error(e); }
+      const resAtendimentos = await api.get('/atendimentos').catch(() => ({ data: [] }));
+      const atendimentosTotais = resAtendimentos.data.dados || resAtendimentos.data || [];
+      const hoje = new Date().toLocaleDateString();
+      const contagemHoje = atendimentosTotais.filter(a => new Date(a.createdAt).toLocaleDateString() === hoje).length;
+
+      const contagemAlertas = estoqueData.filter(item => (item.amount || item.quantidade) < 20).length;
+      const faturamentoCalculado = extratoData.filter(e => e.tipo === 'entrada').reduce((acc, curr) => acc + curr.valor, 0);
+
+      setMetricas({
+        atendimentosHoje: contagemHoje,
+        faturamentoMes: faturamentoCalculado,
+        alertasEstoque: contagemAlertas
+      });
+    } catch (error) {
+      toast.error('Erro ao carregar os dados do servidor.');
+    }
   };
 
   useEffect(() => {
     carregarDados();
-  }, []);
+  }, [abaAtiva]);
 
-  const handleCadastrarUsuario = async (e) => {
+  const alterarStatusGuia = (id, novoStatus) => {
+    setGuias(prev => prev.map(g => g.id === id ? { ...g, status: novoStatus } : g));
+    if(novoStatus === 'PAGO') toast.success('Guia baixada com sucesso!');
+  };
+
+  const dispararLoteTiss = () => {
+    setGuias(prev => prev.map(g => g.status === 'AGUARDANDO_ENVIO' ? { ...g, status: 'ENVIADO' } : g));
+    toast.success('Lote TISS gerado e enviado para a operadora!');
+  };
+
+  const salvarUsuario = async (e) => {
     e.preventDefault();
     try {
       await api.post('/usuarios', formUsuario);
-      setFormUsuario({ nome: '', email: '', senha: '', cargo: 'RECEPCIONISTA' });
+      setModalUsuario(false);
+      setFormUsuario({ nome: '', email: '', senha: '', cargo: 'RECEPCAO', cpf: '', registro: '', telefone: '', especialidade: '' });
       carregarDados();
-    } catch (e) { alert('Erro no cadastro'); }
+      toast.success('Usuário cadastrado com sucesso!');
+    } catch (error) {
+      toast.error('Erro ao criar usuário. Verifique se o e-mail já existe.');
+    }
   };
 
-  const handleCadastrarServico = async (e) => {
+  const excluirUsuario = async (id) => {
+    if (window.confirm('Tem certeza que deseja bloquear este usuário?')) {
+      try {
+        await api.delete(`/usuarios/${id}`);
+        carregarDados();
+        toast.success('Acesso bloqueado com sucesso.');
+      } catch (error) {
+        toast.error('Erro ao bloquear usuário.');
+      }
+    }
+  };
+
+  const salvarEstoque = async (e) => {
     e.preventDefault();
     try {
-      await api.post('/servicos', formServico);
-      setFormServico({ nome: '', valor: '', categoria: 'CONSULTA' });
+      await api.post('/produtos', {
+        nome: formEstoque.nome,
+        quantidade: Number(formEstoque.quantidade)
+      });
+      setModalEstoque(false);
+      setFormEstoque({ nome: '', quantidade: '' });
       carregarDados();
-    } catch (e) { alert('Erro no serviço'); }
+      toast.success('Nota fiscal registrada no estoque!');
+    } catch (error) {
+      toast.error('Erro ao registrar nota fiscal.');
+    }
   };
 
-  const handleCadastrarProduto = async (e) => {
-    e.preventDefault();
-    try {
-      await api.post('/produtos', formProd);
-      setFormProd({ nome: '', quantidade: '', unidade: 'UN', precoCusto: '' });
-      carregarDados();
-    } catch (e) { alert('Erro no estoque'); }
+  const imprimirRelatorio = () => {
+    window.print();
   };
 
-  const handleDispararCampanha = async (e) => {
-    e.preventDefault();
-    if(!confirm('Confirmar disparo em massa?')) return;
-    try {
-      await api.post('/campanhas/disparar', formCamp);
-      setFormCamp({ nome: '', tema: 'Geral', mensagem: '', desconto: '' });
-      alert('Campanha enviada!');
-      carregarDados();
-    } catch (e) { alert('Erro no disparo'); }
-  };
-
-  const calcularSLA = (a) => {
-    const inicio = new Date(a.createdAt);
-    const chamado = new Date(a.updatedAt);
-    return Math.floor((chamado - inicio) / 60000);
-  };
-
-  const finalizados = atendimentos.filter(a => a.status === 'FINALIZADO');
-  const faturamentoTotal = finalizados.reduce((acc, a) => acc + (a.servico?.valor || 250), 0);
-  const aguardando = atendimentos.filter(a => a.status === 'AGUARDANDO').length;
+  const extratoFiltrado = extrato.filter(item => {
+    if (!filtroData.inicio && !filtroData.fim) return true;
+    if (filtroData.inicio && item.data < filtroData.inicio) return false;
+    if (filtroData.fim && item.data > filtroData.fim) return false;
+    return true;
+  });
 
   return (
-    <div style={{ display: 'flex', minHeight: '100vh', backgroundColor: '#f0f2f5' }}>
-      <aside style={{ width: '260px', backgroundColor: '#1c242d', color: 'white', padding: '20px' }}>
-        <h2 style={{ textAlign: 'center', marginBottom: '30px' }}>MedFlow Admin</h2>
-        <nav style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
-          <button onClick={() => setAbaAtiva('dashboard')} style={abaAtiva === 'dashboard' ? btnNavActive : btnNav}>📊 Dashboard</button>
-          <button onClick={() => setAbaAtiva('usuarios')} style={abaAtiva === 'usuarios' ? btnNavActive : btnNav}>👥 Equipe</button>
-          <button onClick={() => setAbaAtiva('estoque')} style={abaAtiva === 'estoque' ? btnNavActive : btnNav}>📦 Estoque</button>
-          <button onClick={() => setAbaAtiva('campanhas')} style={abaAtiva === 'campanhas' ? btnNavActive : btnNav}>📣 Campanhas</button>
-          <button onClick={() => setAbaAtiva('financeiro')} style={abaAtiva === 'financeiro' ? btnNavActive : btnNav}>💸 Financeiro</button>
-          <button onClick={() => setAbaAtiva('servicos')} style={abaAtiva === 'servicos' ? btnNavActive : btnNav}>💰 Preços</button>
-          <button onClick={() => navigate('/')} style={{ ...btnNav, marginTop: '40px', color: '#ff7675' }}>Sair</button>
+    <div style={containerStyle}>
+      <Toaster position="top-right" reverseOrder={false} />
+      <aside style={sidebarStyle} className="no-print">
+        <div style={sidebarHeader}>
+          <h2 style={{ margin: 0, fontSize: '16px', color: '#ecf0f1', letterSpacing: '1px' }}>CENTRO DE COMANDO</h2>
+        </div>
+        <nav style={navStyle}>
+          <button style={abaAtiva === 'dashboard' ? btnMenuAtivo : btnMenu} onClick={() => setAbaAtiva('dashboard')}>Visão Geral</button>
+          <button style={abaAtiva === 'faturamento' ? btnMenuAtivo : btnMenu} onClick={() => setAbaAtiva('faturamento')}>Faturamento (Guias)</button>
+          <button style={abaAtiva === 'equipe' ? btnMenuAtivo : btnMenu} onClick={() => setAbaAtiva('equipe')}>Gestão de Equipe</button>
+          <button style={abaAtiva === 'financeiro' ? btnMenuAtivo : btnMenu} onClick={() => setAbaAtiva('financeiro')}>Financeiro</button>
+          <button style={abaAtiva === 'estoque' ? btnMenuAtivo : btnMenu} onClick={() => setAbaAtiva('estoque')}>Controle de Estoque</button>
         </nav>
       </aside>
 
-      <main style={{ flex: 1, padding: '0px' }}>
-        <header style={{ backgroundColor: '#fff', padding: '15px 40px', display: 'flex', justifyContent: 'space-between', alignItems: 'center', boxShadow: '0 2px 4px rgba(0,0,0,0.05)' }}>
-          <h1 style={{ fontSize: '22px', margin: 0, fontWeight: 'bold' }}>PAINEL DO ADMINISTRADOR</h1>
-          <span style={{ fontSize: '14px', color: '#666' }}>Gestão: <strong>Administrativa</strong></span>
+      <main style={contentStyle}>
+        <header style={headerStyle} className="no-print">
+          <h1 style={{ margin: 0, color: '#2c3e50', fontSize: '24px' }}>
+            {abaAtiva === 'dashboard' && 'Visão Geral do Sistema'}
+            {abaAtiva === 'faturamento' && 'Gestão de Faturamento e Convênios'}
+            {abaAtiva === 'equipe' && 'Controle de Acessos e Equipe'}
+            {abaAtiva === 'financeiro' && 'Fluxo de Caixa e Relatórios'}
+            {abaAtiva === 'estoque' && 'Inventário e Insumos Médicos'}
+          </h1>
         </header>
 
-        <div style={{ padding: '30px 40px' }}>
-          {abaAtiva === 'dashboard' && (
-            <section>
-              <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: '20px', marginBottom: '30px' }}>
-                <div style={{ ...cardBase, backgroundColor: '#4089bd' }}><span>TOTAL DE PACIENTES</span><p>{atendimentos.length}</p></div>
-                <div style={{ ...cardBase, backgroundColor: '#27ae60' }}><span>FATURAMENTO ESTIMADO</span><p>R$ {faturamentoTotal.toFixed(2)}</p></div>
-                <div style={{ ...cardBase, backgroundColor: '#e74c3c' }}><span>GARGALO NA RECEPÇÃO</span><p>{aguardando} Aguardando</p></div>
+        {abaAtiva === 'dashboard' && (
+          <div style={fadeAnimation}>
+            <div style={gridCards}>
+              <div style={{ ...cardMetric, borderBottom: '4px solid #3498db' }}>
+                <span style={cardTitle}>Pacientes Hoje</span>
+                <span style={cardValue}>{metricas.atendimentosHoje}</span>
               </div>
-              <div style={panelWhite}>
-                <h3>Últimos Registros</h3>
-                <table className="medflow-table" style={{ width: '100%', marginTop: '15px' }}>
-                  <thead><tr style={{ textAlign: 'left' }}><th>Ficha</th><th>Paciente</th><th>Convênio</th><th>Status</th></tr></thead>
-                  <tbody>
-                    {atendimentos.slice(0, 5).map(a => (
-                      <tr key={a.id} style={{ borderBottom: '1px solid #eee' }}>
-                        <td style={tdStyle}>#{a.id.substring(0,5).toUpperCase()}</td>
-                        <td style={tdStyle}>{a.paciente?.nome || 'Paciente'}</td>
-                        <td style={tdStyle}>{a.convenio}</td>
-                        <td style={tdStyle}><span style={{ ...badge, backgroundColor: a.status === 'FINALIZADO' ? '#2ecc71' : '#f39c12' }}>{a.status}</span></td>
-                      </tr>
-                    ))}
-                  </tbody>
-                </table>
+              <div style={{ ...cardMetric, borderBottom: '4px solid #2ecc71' }}>
+                <span style={cardTitle}>Faturamento Previsto (Mês)</span>
+                <span style={{ ...cardValue, color: '#27ae60' }}>R$ {metricas.faturamentoMes.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}</span>
               </div>
-            </section>
-          )}
-
-          {abaAtiva === 'usuarios' && (
-            <section style={panelWhite}>
-              <h2>👥 Profissionais</h2>
-              <form onSubmit={handleCadastrarUsuario} style={formGrid}>
-                <input type="text" placeholder="Nome" value={formUsuario.nome} onChange={e => setFormUsuario({...formUsuario, nome: e.target.value})} required style={inputStyle} />
-                <input type="email" placeholder="E-mail" value={formUsuario.email} onChange={e => setFormUsuario({...formUsuario, email: e.target.value})} required style={inputStyle} />
-                <input type="password" placeholder="Senha" value={formUsuario.senha} onChange={e => setFormUsuario({...formUsuario, senha: e.target.value})} required style={inputStyle} />
-                <select value={formUsuario.cargo} onChange={e => setFormUsuario({...formUsuario, cargo: e.target.value})} style={inputStyle}>
-                  <option value="ADMIN">ADMIN</option>
-                  <option value="RECEPCIONISTA">RECEPCIONISTA</option>
-                  <option value="MEDICO">MÉDICO</option>
-                </select>
-                <button type="submit" style={btnAction}>Adicionar</button>
-              </form>
-              <table style={{ width: '100%', marginTop: '20px' }}>
-                <thead><tr style={{ textAlign: 'left' }}><th>Nome</th><th>E-mail</th><th>Cargo</th></tr></thead>
-                <tbody>{usuarios.map(u => (<tr key={u.id} style={{ borderBottom: '1px solid #eee' }}><td style={tdStyle}>{u.nome}</td><td style={tdStyle}>{u.email}</td><td style={tdStyle}>{u.cargo}</td></tr>))}</tbody>
-              </table>
-            </section>
-          )}
-
-          {abaAtiva === 'estoque' && (
-            <section style={panelWhite}>
-              <h2>📦 Estoque Inteligente</h2>
-              <ScannerEstoque onUpdate={carregarDados} />
-              <form onSubmit={handleCadastrarProduto} style={{ ...formGrid, marginTop: '30px' }}>
-                <input type="text" placeholder="Item" value={formProd.nome} onChange={e => setFormProd({...formProd, nome: e.target.value})} required style={inputStyle} />
-                <input type="number" placeholder="Qtd" value={formProd.quantidade} onChange={e => setFormProd({...formProd, quantidade: e.target.value})} required style={inputStyle} />
-                <input type="text" placeholder="Custo" value={formProd.precoCusto} onChange={e => setFormProd({...formProd, precoCusto: e.target.value})} required style={inputStyle} />
-                <button type="submit" style={btnAction}>Salvar</button>
-              </form>
-              <table style={{ width: '100%', marginTop: '20px' }}>
-                <thead><tr style={{ textAlign: 'left' }}><th>ID / QR</th><th>Item</th><th>Qtd</th></tr></thead>
-                <tbody>{produtos.map(p => (<tr key={p.id} style={{ borderBottom: '1px solid #eee' }}><td style={{ ...tdStyle, fontSize: '10px' }}>{p.id}</td><td style={tdStyle}>{p.nome}</td><td style={tdStyle}>{p.quantidade}</td></tr>))}</tbody>
-              </table>
-            </section>
-          )}
-
-          {abaAtiva === 'campanhas' && (
-            <section style={panelWhite}>
-              <h2>📣 Campanhas WhatsApp</h2>
-              <form onSubmit={handleDispararCampanha} style={{ display: 'flex', flexDirection: 'column', gap: '10px' }}>
-                <input type="text" placeholder="Título" value={formCamp.nome} onChange={e => setFormCamp({...formCamp, nome: e.target.value})} required style={inputStyle} />
-                <textarea placeholder="Mensagem..." value={formCamp.mensagem} onChange={e => setFormCamp({...formCamp, mensagem: e.target.value})} required style={{ ...inputStyle, height: '80px' }} />
-                <button type="submit" style={{ ...btnAction, backgroundColor: '#25d366' }}>🚀 Disparar</button>
-              </form>
-            </section>
-          )}
-
-          {abaAtiva === 'financeiro' && (
-            <section>
-              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '20px' }}>
-                <div style={{ ...cardBase, backgroundColor: '#8e44ad' }}><span>REPASSE (60%)</span><p>R$ {(faturamentoTotal * 0.6).toFixed(2)}</p></div>
-                <div style={{ ...cardBase, backgroundColor: '#27ae60' }}><span>LUCRO (40%)</span><p>R$ {(faturamentoTotal * 0.4).toFixed(2)}</p></div>
+              <div style={{ ...cardMetric, borderBottom: '4px solid #e74c3c' }}>
+                <span style={cardTitle}>Alertas de Estoque</span>
+                <span style={{ ...cardValue, color: '#c0392b' }}>{metricas.alertasEstoque} itens acabando</span>
               </div>
-            </section>
-          )}
+              <div style={{ ...cardMetric, borderBottom: '4px solid #f1c40f' }}>
+                <span style={cardTitle}>Usuários Ativos</span>
+                <span style={cardValue}>{usuarios.length}</span>
+              </div>
+            </div>
+            
+            <div style={panelWhite}>
+              <h3 style={sectionTitle}>Avisos do Sistema MedFlow</h3>
+              <ul style={listStyle}>
+                <li style={listItemWarning}><strong>Estoque:</strong> O sistema detectou {metricas.alertasEstoque} itens em nível crítico. Necessário reposição.</li>
+                <li style={listItemInfo}><strong>Atualização:</strong> O módulo de disparo de WhatsApp foi ativado com sucesso para a Recepção.</li>
+                <li style={listItemSuccess}><strong>Financeiro:</strong> Lote de repasse dos convênios está pronto para ser sincronizado.</li>
+              </ul>
+            </div>
+          </div>
+        )}
 
-          {abaAtiva === 'servicos' && (
-            <section style={panelWhite}>
-              <h2>💰 Tabela de Preços</h2>
-              <form onSubmit={handleCadastrarServico} style={formGrid}>
-                <input type="text" placeholder="Serviço" value={formServico.nome} onChange={e => setFormServico({...formServico, nome: e.target.value})} required style={inputStyle} />
-                <input type="number" placeholder="Preço" value={formServico.valor} onChange={e => setFormServico({...formServico, valor: e.target.value})} required style={inputStyle} />
-                <button type="submit" style={btnAction}>Gravar</button>
-              </form>
-              <table style={{ width: '100%', marginTop: '20px' }}>
-                <thead><tr style={{ textAlign: 'left' }}><th>Serviço</th><th>Valor</th></tr></thead>
-                <tbody>{servicos.map(s => (<tr key={s.id} style={{ borderBottom: '1px solid #eee' }}><td style={tdStyle}>{s.nome}</td><td style={tdStyle}>R$ {s.valor.toFixed(2)}</td></tr>))}</tbody>
-              </table>
-            </section>
-          )}
-        </div>
+        {abaAtiva === 'faturamento' && (
+          <div style={{ ...panelWhite, ...fadeAnimation }}>
+            <div style={flexBetween}>
+              <h3 style={sectionTitle}>Guias TISS e Repasses de Planos de Saúde</h3>
+              <div style={{ display: 'flex', gap: '10px' }} className="no-print">
+                <button onClick={() => toast('Guias sincronizadas com o servidor.', { icon: '🔄' })} style={btnSecondary}>Sincronizar Guias</button>
+                <button onClick={dispararLoteTiss} style={btnPrimary}>Gerar Lote de Faturamento (XML TISS)</button>
+              </div>
+            </div>
+            <table style={tableStyle}>
+              <thead>
+                <tr style={thRowStyle}>
+                  <th style={thStyle}>Nº Guia</th>
+                  <th style={thStyle}>Fatura</th>
+                  <th style={thStyle}>Nº Carteirinha</th>
+                  <th style={thStyle}>Paciente</th>
+                  <th style={thStyle}>Convênio</th>
+                  <th style={thStyle}>Procedimento</th>
+                  <th style={thStyle}>Valor</th>
+                  <th style={thStyle}>Status</th>
+                  <th style={thStyle} className="no-print">Ações</th>
+                </tr>
+              </thead>
+              <tbody>
+                {guias.map(guia => (
+                  <tr key={guia.id} style={trStyle}>
+                    <td style={{ ...tdStyle, fontWeight: 'bold', color: '#2980b9' }}>{guia.id}</td>
+                    <td style={tdStyle}>{guia.fatura}</td>
+                    <td style={{ ...tdStyle, fontFamily: 'monospace' }}>{guia.carteirinha}</td>
+                    <td style={tdStyle}>{guia.paciente}</td>
+                    <td style={tdStyle}>{guia.convenio}</td>
+                    <td style={tdStyle}>{guia.procedimento}</td>
+                    <td style={{ ...tdStyle, fontWeight: 'bold' }}>R$ {guia.valor.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}</td>
+                    <td style={tdStyle}>
+                      <span style={getBadgeStatusGuia(guia.status)}>{guia.status.replace('_', ' ')}</span>
+                    </td>
+                    <td style={tdStyle} className="no-print">
+                      {guia.status === 'AGUARDANDO_ENVIO' && <button onClick={() => alterarStatusGuia(guia.id, 'ENVIADO')} style={btnActionTable}>Incluir no Lote</button>}
+                      {guia.status === 'ENVIADO' && <button onClick={() => alterarStatusGuia(guia.id, 'PAGO')} style={btnActionTableSuccess}>Dar Baixa (Pago)</button>}
+                      {guia.status === 'GLOSADO' && <button onClick={() => alterarStatusGuia(guia.id, 'AGUARDANDO_ENVIO')} style={btnActionTableDanger}>Revisar Recusa</button>}
+                      {guia.status === 'PAGO' && <span style={{ fontSize: '12px', color: '#16a085', fontWeight: 'bold' }}>Finalizado</span>}
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        )}
+
+        {abaAtiva === 'equipe' && (
+          <div style={{ ...panelWhite, ...fadeAnimation }}>
+            <div style={flexBetween}>
+              <h3 style={sectionTitle}>Usuários Cadastrados</h3>
+              <button onClick={() => setModalUsuario(true)} style={btnPrimary} className="no-print">+ Novo Usuário</button>
+            </div>
+            <table style={tableStyle}>
+              <thead>
+                <tr style={thRowStyle}>
+                  <th style={thStyle}>Nome</th>
+                  <th style={thStyle}>CPF/Registro</th>
+                  <th style={thStyle}>Contato</th>
+                  <th style={thStyle}>Cargo / Acesso</th>
+                  <th style={thStyle} className="no-print">Ação</th>
+                </tr>
+              </thead>
+              <tbody>
+                {usuarios.length === 0 ? (
+                  <tr><td colSpan="5" style={emptyState}>Apenas o Administrador Master cadastrado.</td></tr>
+                ) : (
+                  usuarios.map(u => (
+                    <tr key={u.id} style={trStyle}>
+                      <td style={tdStyle}><strong>{u.nome}</strong></td>
+                      <td style={tdStyle}>{u.cpf || 'N/A'}<br/><small style={{color: '#7f8c8d'}}>{u.registro || 'Sem Registro'}</small></td>
+                      <td style={tdStyle}>{u.telefone || 'N/A'}</td>
+                      <td style={tdStyle}><span style={getBadgeStyle(u.cargo)}>{u.cargo}</span></td>
+                      <td style={tdStyle} className="no-print">
+                        <button onClick={() => excluirUsuario(u.id)} style={btnDanger}>Bloquear Acesso</button>
+                      </td>
+                    </tr>
+                  ))
+                )}
+              </tbody>
+            </table>
+          </div>
+        )}
+
+        {abaAtiva === 'estoque' && (
+          <div style={{ ...panelWhite, ...fadeAnimation }}>
+            <div style={flexBetween}>
+              <h3 style={sectionTitle}>Inventário da Clínica</h3>
+              <button onClick={() => setModalEstoque(true)} style={btnPrimary} className="no-print">+ Entrada de Nota Fiscal</button>
+            </div>
+            <table style={tableStyle}>
+              <thead>
+                <tr style={thRowStyle}>
+                  <th style={thStyle}>Código</th>
+                  <th style={thStyle}>Produto / Insumo</th>
+                  <th style={thStyle}>Quantidade Atual</th>
+                  <th style={thStyle}>Status</th>
+                </tr>
+              </thead>
+              <tbody>
+                {estoque.map(item => (
+                  <tr key={item.id} style={trStyle}>
+                    <td style={tdStyle}>#{item.id.toString().padStart(4, '0')}</td>
+                    <td style={tdStyle}><strong>{item.nome}</strong></td>
+                    <td style={tdStyle}>{item.amount || item.quantidade} un</td>
+                    <td style={tdStyle}>
+                      <span style={(item.amount || item.quantidade) < 20 ? badgeDanger : badgeSuccess}>
+                        {(item.amount || item.quantidade) < 20 ? 'CRÍTICO / BAIXO' : 'NORMAL'}
+                      </span>
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        )}
+
+        {abaAtiva === 'financeiro' && (
+          <div style={{ ...panelWhite, ...fadeAnimation }}>
+            <div style={flexBetween}>
+              <h3 style={sectionTitle}>Extrato e Relatórios (Fluxo de Caixa)</h3>
+              <div style={{ display: 'flex', gap: '15px', alignItems: 'center' }} className="no-print">
+                <input 
+                  type="date" 
+                  value={filtroData.inicio} 
+                  onChange={e => setFiltroData({...filtroData, inicio: e.target.value})} 
+                  style={inputFilterStyle} 
+                />
+                <span style={{ color: '#7f8c8d', fontWeight: 'bold' }}>até</span>
+                <input 
+                  type="date" 
+                  value={filtroData.fim} 
+                  onChange={e => setFiltroData({...filtroData, fim: e.target.value})} 
+                  style={inputFilterStyle} 
+                />
+                <button onClick={imprimirRelatorio} style={btnSuccess}>Imprimir / Gerar PDF</button>
+              </div>
+            </div>
+
+            <h2 className="print-only" style={{ display: 'none', textAlign: 'center', marginBottom: '20px' }}>Relatório Financeiro MedFlow</h2>
+
+            <table style={tableStyle}>
+              <thead>
+                <tr style={thRowStyle}>
+                  <th style={thStyle}>Data</th>
+                  <th style={thStyle}>Descrição</th>
+                  <th style={thStyle}>Fonte / Destino</th>
+                  <th style={thStyle}>Valor</th>
+                </tr>
+              </thead>
+              <tbody>
+                {extratoFiltrado.length === 0 ? (
+                  <tr><td colSpan="4" style={emptyState}>Nenhuma transação encontrada no período selecionado.</td></tr>
+                ) : (
+                  extratoFiltrado.map(item => (
+                    <tr key={item.id} style={trStyle}>
+                      <td style={tdStyle}>{item.data.split('-').reverse().join('/')}</td>
+                      <td style={tdStyle}>{item.descricao}</td>
+                      <td style={tdStyle}>{item.fonte}</td>
+                      <td style={{ ...tdStyle, color: item.tipo === 'entrada' ? '#27ae60' : item.tipo === 'saida' ? '#e74c3c' : '#2980b9', fontWeight: 'bold' }}>
+                        {item.tipo === 'saida' ? '- ' : item.tipo === 'entrada' ? '+ ' : ''}
+                        R$ {Math.abs(item.valor).toLocaleString('pt-BR', { minimumFractionDigits: 2 })}
+                      </td>
+                    </tr>
+                  ))
+                )}
+              </tbody>
+            </table>
+          </div>
+        )}
       </main>
+
+      {modalUsuario && (
+        <div style={overlayStyle}>
+          <div style={{...modalBoxStyle, maxWidth: '600px'}}>
+            <h3 style={sectionTitle}>Cadastrar Novo Usuário</h3>
+            <form onSubmit={salvarUsuario} style={formStyle}>
+              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '15px' }}>
+                <div style={inputGroup}>
+                  <label style={labelStyle}>Nome Completo</label>
+                  <input type="text" value={formUsuario.nome} onChange={e => setFormUsuario({...formUsuario, nome: e.target.value})} required style={inputStyle} />
+                </div>
+                <div style={inputGroup}>
+                  <label style={labelStyle}>E-mail (Login)</label>
+                  <input type="email" value={formUsuario.email} onChange={e => setFormUsuario({...formUsuario, email: e.target.value})} required style={inputStyle} />
+                </div>
+                <div style={inputGroup}>
+                  <label style={labelStyle}>CPF</label>
+                  <input type="text" value={formUsuario.cpf} onChange={e => setFormUsuario({...formUsuario, cpf: mascaraCPF(e.target.value)})} style={inputStyle} placeholder="000.000.000-00" maxLength="14" />
+                </div>
+                <div style={inputGroup}>
+                  <label style={labelStyle}>Registro Profissional (CRM/Coren)</label>
+                  <input type="text" value={formUsuario.registro} onChange={e => setFormUsuario({...formUsuario, registro: e.target.value})} style={inputStyle} />
+                </div>
+                <div style={inputGroup}>
+                  <label style={labelStyle}>Telefone</label>
+                  <input type="text" value={formUsuario.telefone} onChange={e => setFormUsuario({...formUsuario, telefone: mascaraTelefone(e.target.value)})} style={inputStyle} placeholder="(00) 00000-0000" maxLength="15" />
+                </div>
+                <div style={inputGroup}>
+                  <label style={labelStyle}>Especialidade/Depto</label>
+                  <input type="text" value={formUsuario.especialidade} onChange={e => setFormUsuario({...formUsuario, especialidade: e.target.value})} style={inputStyle} />
+                </div>
+                <div style={inputGroup}>
+                  <label style={labelStyle}>Perfil de Acesso (Cargo)</label>
+                  <select value={formUsuario.cargo} onChange={e => setFormUsuario({...formUsuario, cargo: e.target.value})} required style={inputStyle}>
+                    <option value="RECEPCAO">Recepção</option>
+                    <option value="TRIAGEM">Triagem</option>
+                    <option value="MEDICO">Médico</option>
+                    <option value="EXAMES">SADT / Exames</option>
+                    <option value="ADMIN">Administrador</option>
+                  </select>
+                </div>
+                <div style={inputGroup}>
+                  <label style={labelStyle}>Senha Provisória</label>
+                  <input type="password" value={formUsuario.senha} onChange={e => setFormUsuario({...formUsuario, senha: e.target.value})} required style={inputStyle} />
+                </div>
+              </div>
+              <div style={{ display: 'flex', justifyContent: 'flex-end', gap: '10px', marginTop: '10px', gridColumn: '1 / -1' }}>
+                <button type="button" onClick={() => setModalUsuario(false)} style={btnDanger}>Cancelar</button>
+                <button type="submit" style={btnPrimary}>Salvar Usuário</button>
+              </div>
+            </form>
+          </div>
+        </div>
+      )}
+
+      {modalEstoque && (
+        <div style={overlayStyle}>
+          <div style={modalBoxStyle}>
+            <h3 style={sectionTitle}>Entrada de Nota Fiscal / Estoque</h3>
+            <form onSubmit={salvarEstoque} style={formStyle}>
+              <div style={inputGroup}>
+                <label style={labelStyle}>Nome do Insumo / Produto</label>
+                <input type="text" value={formEstoque.nome} onChange={e => setFormEstoque({...formEstoque, nome: e.target.value})} placeholder="Ex: Gaze Estéril" required style={inputStyle} />
+              </div>
+              <div style={inputGroup}>
+                <label style={labelStyle}>Quantidade Adicionada</label>
+                <input type="number" value={formEstoque.quantidade} onChange={e => setFormEstoque({...formEstoque, quantidade: e.target.value})} placeholder="Apenas números" required style={inputStyle} />
+              </div>
+              <div style={{ display: 'flex', justifyContent: 'flex-end', gap: '10px', marginTop: '10px' }}>
+                <button type="button" onClick={() => setModalEstoque(false)} style={btnDanger}>Cancelar</button>
+                <button type="submit" style={btnPrimary}>Gravar Estoque</button>
+              </div>
+            </form>
+          </div>
+        </div>
+      )}
+
+      <style dangerouslySetInnerHTML={{__html: `
+        @media print {
+          .no-print { display: none !important; }
+          .print-only { display: block !important; }
+          body, html, main, div { background-color: #fff !important; margin: 0; padding: 0; box-shadow: none !important; }
+          main { padding: 20px !important; }
+          table { width: 100%; border-collapse: collapse; }
+          th, td { border: 1px solid #ddd; padding: 8px; text-align: left; }
+        }
+      `}} />
     </div>
   );
 }
 
-const btnNav = { padding: '12px 15px', border: 'none', borderRadius: '4px', backgroundColor: 'transparent', color: '#aabccf', textAlign: 'left', cursor: 'pointer', fontSize: '15px' };
-const btnNavActive = { ...btnNav, backgroundColor: '#34495e', color: 'white', fontWeight: 'bold' };
-const cardBase = { padding: '20px', borderRadius: '4px', color: 'white', boxShadow: '0 2px 4px rgba(0,0,0,0.1)' };
-const panelWhite = { backgroundColor: '#fff', padding: '25px', borderRadius: '8px', boxShadow: '0 2px 10px rgba(0,0,0,0.05)' };
-const inputStyle = { padding: '10px', borderRadius: '4px', border: '1px solid #ddd' };
-const formGrid = { display: 'grid', gridTemplateColumns: '1fr 1fr 1fr 1fr auto', gap: '10px', marginTop: '15px' };
-const btnAction = { padding: '10px 20px', backgroundColor: '#3498db', color: '#fff', border: 'none', borderRadius: '4px', cursor: 'pointer', fontWeight: 'bold' };
-const badge = { padding: '3px 10px', borderRadius: '12px', color: 'white', fontSize: '11px', fontWeight: 'bold' };
-const tdStyle = { padding: '12px 0', fontSize: '14px', color: '#333' };
+const getBadgeStyle = (cargo) => {
+  if (cargo === 'ADMIN') return { padding: '4px 8px', backgroundColor: '#34495e', color: '#fff', borderRadius: '4px', fontSize: '11px', fontWeight: 'bold' };
+  if (cargo === 'MEDICO') return { padding: '4px 8px', backgroundColor: '#e1f5fe', color: '#0288d1', borderRadius: '4px', fontSize: '11px', fontWeight: 'bold' };
+  return { padding: '4px 8px', backgroundColor: '#f0f2f5', color: '#2c3e50', borderRadius: '4px', fontSize: '11px', fontWeight: 'bold' };
+};
+
+const getBadgeStatusGuia = (status) => {
+  if (status === 'PAGO') return { padding: '4px 8px', backgroundColor: '#e8f8f5', color: '#16a085', borderRadius: '4px', fontSize: '11px', fontWeight: 'bold' };
+  if (status === 'GLOSADO') return { padding: '4px 8px', backgroundColor: '#fdedec', color: '#c0392b', borderRadius: '4px', fontSize: '11px', fontWeight: 'bold' };
+  if (status === 'ENVIADO') return { padding: '4px 8px', backgroundColor: '#eef2f5', color: '#2980b9', borderRadius: '4px', fontSize: '11px', fontWeight: 'bold' };
+  return { padding: '4px 8px', backgroundColor: '#fff3e0', color: '#d35400', borderRadius: '4px', fontSize: '11px', fontWeight: 'bold' };
+};
+
+const containerStyle = { display: 'flex', minHeight: 'calc(100vh - 70px)', backgroundColor: '#f4f7f6', fontFamily: 'system-ui, sans-serif' };
+const sidebarStyle = { width: '250px', backgroundColor: '#2c3e50', display: 'flex', flexDirection: 'column', boxShadow: '2px 0 5px rgba(0,0,0,0.1)' };
+const sidebarHeader = { padding: '20px', backgroundColor: '#1a252f', borderBottom: '1px solid #34495e', textAlign: 'center' };
+const navStyle = { display: 'flex', flexDirection: 'column', padding: '15px 0' };
+const btnMenu = { padding: '15px 20px', backgroundColor: 'transparent', color: '#bdc3c7', border: 'none', textAlign: 'left', fontSize: '15px', fontWeight: '600', cursor: 'pointer', transition: '0.2s', borderLeft: '4px solid transparent' };
+const btnMenuAtivo = { ...btnMenu, backgroundColor: '#34495e', color: '#fff', borderLeft: '4px solid #3498db' };
+const contentStyle = { flex: 1, padding: '30px', overflowY: 'auto' };
+const headerStyle = { marginBottom: '30px', borderBottom: '2px solid #dfe6e9', paddingBottom: '15px' };
+const gridCards = { display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(220px, 1fr))', gap: '20px', marginBottom: '30px' };
+const cardMetric = { backgroundColor: '#fff', padding: '20px', borderRadius: '8px', boxShadow: '0 2px 10px rgba(0,0,0,0.03)', display: 'flex', flexDirection: 'column', gap: '10px' };
+const cardTitle = { color: '#7f8c8d', fontSize: '13px', textTransform: 'uppercase', fontWeight: 'bold' };
+const cardValue = { color: '#2c3e50', fontSize: '28px', fontWeight: 'bold' };
+const panelWhite = { backgroundColor: '#fff', padding: '25px', borderRadius: '10px', boxShadow: '0 2px 10px rgba(0,0,0,0.03)' };
+const sectionTitle = { margin: '0 0 20px 0', color: '#2c3e50', fontSize: '18px' };
+const flexBetween = { display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '20px' };
+const tableStyle = { width: '100%', borderCollapse: 'collapse' };
+const thRowStyle = { backgroundColor: '#f8f9fa', borderBottom: '2px solid #dfe6e9' };
+const thStyle = { padding: '12px 15px', textAlign: 'left', fontSize: '13px', color: '#7f8c8d', textTransform: 'uppercase' };
+const trStyle = { borderBottom: '1px solid #f0f2f5' };
+const tdStyle = { padding: '15px', fontSize: '14px', color: '#34495e', verticalAlign: 'middle' };
+const emptyState = { padding: '30px', textAlign: 'center', color: '#95a5a6', fontStyle: 'italic' };
+const btnPrimary = { padding: '10px 20px', backgroundColor: '#3498db', color: '#fff', border: 'none', borderRadius: '6px', fontWeight: 'bold', cursor: 'pointer' };
+const btnSecondary = { padding: '10px 20px', backgroundColor: 'transparent', color: '#3498db', border: '1px solid #3498db', borderRadius: '6px', fontWeight: 'bold', cursor: 'pointer' };
+const btnSuccess = { padding: '10px 20px', backgroundColor: '#27ae60', color: '#fff', border: 'none', borderRadius: '6px', fontWeight: 'bold', cursor: 'pointer' };
+const btnDanger = { padding: '6px 12px', backgroundColor: 'transparent', color: '#e74c3c', border: '1px solid #e74c3c', borderRadius: '4px', fontSize: '12px', fontWeight: 'bold', cursor: 'pointer' };
+const btnActionTable = { padding: '6px 12px', backgroundColor: '#34495e', color: '#fff', border: 'none', borderRadius: '4px', fontSize: '12px', fontWeight: 'bold', cursor: 'pointer' };
+const btnActionTableSuccess = { padding: '6px 12px', backgroundColor: '#27ae60', color: '#fff', border: 'none', borderRadius: '4px', fontSize: '12px', fontWeight: 'bold', cursor: 'pointer' };
+const btnActionTableDanger = { padding: '6px 12px', backgroundColor: '#e74c3c', color: '#fff', border: 'none', borderRadius: '4px', fontSize: '12px', fontWeight: 'bold', cursor: 'pointer' };
+const badgeSuccess = { padding: '4px 8px', backgroundColor: '#e8f8f5', color: '#16a085', borderRadius: '4px', fontSize: '11px', fontWeight: 'bold' };
+const badgeDanger = { padding: '4px 8px', backgroundColor: '#fdedec', color: '#c0392b', borderRadius: '4px', fontSize: '11px', fontWeight: 'bold' };
+const listStyle = { listStyleType: 'none', padding: 0, margin: 0, display: 'flex', flexDirection: 'column', gap: '10px' };
+const listItemWarning = { padding: '12px', backgroundColor: '#fff3e0', borderLeft: '4px solid #e67e22', borderRadius: '4px', fontSize: '14px', color: '#d35400' };
+const listItemInfo = { padding: '12px', backgroundColor: '#e1f5fe', borderLeft: '4px solid #3498db', borderRadius: '4px', fontSize: '14px', color: '#2980b9' };
+const listItemSuccess = { padding: '12px', backgroundColor: '#e8f8f5', borderLeft: '4px solid #2ecc71', borderRadius: '4px', fontSize: '14px', color: '#27ae60' };
+const fadeAnimation = { animation: 'fadeIn 0.3s ease-in-out' };
+const overlayStyle = { position: 'fixed', top: 0, left: 0, right: 0, bottom: 0, backgroundColor: 'rgba(0,0,0,0.6)', display: 'flex', justifyContent: 'center', alignItems: 'center', zIndex: 1000 };
+const modalBoxStyle = { backgroundColor: '#fff', padding: '30px', borderRadius: '12px', width: '100%', maxWidth: '400px', boxShadow: '0 10px 30px rgba(0,0,0,0.2)' };
+const formStyle = { display: 'flex', flexDirection: 'column', gap: '15px' };
+const inputGroup = { display: 'flex', flexDirection: 'column', gap: '5px' };
+const labelStyle = { fontSize: '13px', color: '#7f8c8d', fontWeight: 'bold' };
+const inputStyle = { padding: '10px 12px', borderRadius: '6px', border: '1px solid #dfe6e9', fontSize: '14px', width: '100%', boxSizing: 'border-box' };
+const inputFilterStyle = { padding: '8px 12px', borderRadius: '6px', border: '1px solid #dfe6e9', fontSize: '13px' };

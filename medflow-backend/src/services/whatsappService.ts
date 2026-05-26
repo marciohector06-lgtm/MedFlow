@@ -1,12 +1,12 @@
 import axios from 'axios';
 
 class WhatsAppQueue {
-  private queue: Array<{ telefone: string; mensagem: string }> = [];
+  private queue: Array<{ telefone: string; templateName: string; parametros: string[] }> = [];
   private isProcessing = false;
 
-  adicionar(telefone: string, mensagem: string) {
+  adicionar(telefone: string, templateName: string, parametros: string[]) {
     const telefoneFormatado = telefone.replace(/\D/g, '');
-    this.queue.push({ telefone: `55${telefoneFormatado}`, mensagem });
+    this.queue.push({ telefone: `55${telefoneFormatado}`, templateName, parametros });
     
     if (!this.isProcessing) {
       this.processar();
@@ -20,16 +20,25 @@ class WhatsAppQueue {
     }
 
     this.isProcessing = true;
-    const { telefone, mensagem } = this.queue.shift()!;
+    const { telefone, templateName, parametros } = this.queue.shift()!;
 
     try {
       await axios.post(
-        `https://graph.facebook.com/v25.0/${process.env.WA_PHONE_ID}/messages`,
+        `https://graph.facebook.com/v20.0/${process.env.WA_PHONE_ID}/messages`,
         {
           messaging_product: 'whatsapp',
           to: telefone,
-          type: 'text',
-          text: { body: mensagem },
+          type: 'template',
+          template: {
+            name: templateName,
+            language: { code: 'pt_BR' },
+            components: parametros.length > 0 ? [
+              {
+                type: 'body',
+                parameters: parametros.map(param => ({ type: 'text', text: param }))
+              }
+            ] : []
+          }
         },
         {
           headers: {
@@ -39,7 +48,7 @@ class WhatsAppQueue {
         }
       );
     } catch (error: any) {
-      console.error('Erro na fila do WhatsApp:', error?.response?.data || error.message);
+      console.error(error?.response?.data || error.message);
     }
 
     setTimeout(() => this.processar(), 1000);
