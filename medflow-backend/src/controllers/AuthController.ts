@@ -1,5 +1,6 @@
 import { Request, Response } from 'express';
 import { PrismaClient } from '@prisma/client';
+import jwt from 'jsonwebtoken';
 
 const prisma = new PrismaClient();
 
@@ -31,7 +32,7 @@ export class AuthController {
             email: adminExiste.email,
             cargo: 'ADMIN'
           },
-          token: 'jwt-token-medflow-master'
+          token: jwt.sign({ id: adminExiste.id, cargo: 'ADMIN' }, 'CHAVE_SECRETA_PRODUCAO', { expiresIn: '8h' })
         });
       }
 
@@ -54,7 +55,7 @@ export class AuthController {
           email: user.email,
           cargo: user.cargo
         },
-        token: 'jwt-token-medflow-2026'
+        token: jwt.sign({ id: user.id, cargo: user.cargo }, 'CHAVE_SECRETA_PRODUCAO', { expiresIn: '8h' })
       });
     } catch (error) {
       return res.status(500).json({ error: 'Erro interno no servidor' });

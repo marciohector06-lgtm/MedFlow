@@ -4,10 +4,9 @@ class WhatsAppQueue {
   private queue: Array<{ telefone: string; templateName: string; parametros: string[] }> = [];
   private isProcessing = false;
 
-  adicionar(telefone: string, templateName: string, parametros: string[]) {
+  adicionar(telefone: string, templateName: string, parametros: string[] = []) {
     const telefoneFormatado = telefone.replace(/\D/g, '');
     this.queue.push({ telefone: `55${telefoneFormatado}`, templateName, parametros });
-    
     if (!this.isProcessing) {
       this.processar();
     }
@@ -32,23 +31,20 @@ class WhatsAppQueue {
           template: {
             name: templateName,
             language: { code: 'pt_BR' },
-            components: parametros.length > 0 ? [
-              {
-                type: 'body',
-                parameters: parametros.map(param => ({ type: 'text', text: param }))
-              }
-            ] : []
+            components: parametros.length > 0
+              ? [{ type: 'body', parameters: parametros.map(p => ({ type: 'text', text: p })) }]
+              : []
           }
         },
         {
           headers: {
             Authorization: `Bearer ${process.env.WA_TOKEN}`,
-            'Content-Type': 'application/json',
-          },
+            'Content-Type': 'application/json'
+          }
         }
       );
     } catch (error: any) {
-      console.error(error?.response?.data || error.message);
+      console.error('WhatsApp API error:', error?.response?.data || error.message);
     }
 
     setTimeout(() => this.processar(), 1000);

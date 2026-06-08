@@ -97,15 +97,3 @@ model Campanha {
   status    String   @default("RASCUNHO")
   createdAt DateTime @default(now())
 }
-model Usuario {
-  id            String  @id @default(uuid())
-  nome          String
-  email         String  @unique
-  senha         String
-  cargo         String
-  cpf           String?
-  registro      String?
-  telefone      String?
-  especialidade String?
-  createdAt     DateTime @default(now())
-}

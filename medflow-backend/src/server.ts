@@ -21,10 +21,7 @@ app.use(express.json());
 
 app.use(router);
 
-io.on('connection', (socket) => {
-  socket.on('disconnect', () => {
-  });
-});
+io.on('connection', (_socket) => {});
 
 server.listen(3333, () => {
   console.log('Servidor MedFlow rodando na porta 3333');
